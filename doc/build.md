@@ -1,202 +1,303 @@
-#Build Snapcast
-Clone the Snapcast repository. To do this, you need git.  
-For Debian derivates (e.g. Raspbian, Debian, Ubuntu, Mint):
+# Build Snapcast
 
-    $ sudo apt-get install git
+Clone the Snapcast repository. To do this, you need git.  
+For Debian derivates (e.g. Raspberry Pi OS, Debian, Ubuntu, Mint):
+
+```sh
+sudo apt-get install git
+```
 
 For Arch derivates:
 
-    $ pacman -S git
+```sh
+sudo pacman -S git
+```
 
 For FreeBSD:
 
-    $ sudo pkg install git
+```sh
+sudo pkg install git
+```
 
 Clone Snapcast:
 
-    $ git clone https://github.com/badaix/snapcast.git
+```sh
+git clone https://github.com/badaix/snapcast.git
+```
 
-this creates a directory `snapcast`, in the following referred to as `<snapcast dir>`.  
-Next clone the external submodules:
+Snapcast depends on boost 1.70 or higher. Since it depends on header only boost libs, boost does not need to be installed, but the boost include path must be set properly: download and extract the latest boost version and add the include path, e.g. calling `make` with prepended `ADD_CFLAGS`: `ADD_CFLAGS="-I/path/to/boost_1_7x_0/" make`.  
+For `cmake` you must add the path to the `-DBOOST_ROOT` flag: `cmake -DBOOST_ROOT=/path/to/boost_1_7x_0`
 
-    $ cd <snapcast dir>/externals
-    $ git submodule update --init --recursive
+## Linux (Native)
 
-
-##Linux (Native)
 Install the build tools and required libs:  
-For Debian derivates (e.g. Raspbian, Debian, Ubuntu, Mint):
+For Debian derivates (e.g. Raspberry Pi OS, Debian, Ubuntu, Mint):
 
-    $ sudo apt-get install build-essential
-    $ sudo apt-get install libasound2-dev libvorbisidec-dev libvorbis-dev libflac-dev alsa-utils libavahi-client-dev avahi-daemon
+```sh
+sudo apt-get install build-essential
+sudo apt-get install libasound2-dev libpulse-dev libvorbisidec-dev libvorbis-dev libopus-dev libflac-dev libsoxr-dev alsa-utils libavahi-client-dev avahi-daemon libexpat1-dev
+```
 
 Compilation requires gcc 4.8 or higher, so it's highly recommended to use Debian (Raspbian) Jessie.
 
 For Arch derivates:
 
-    $ pacman -S base-devel
-    $ pacman -S alsa-lib avahi libvorbis flac alsa-utils
+```sh
+sudo pacman -S base-devel
+sudo pacman -S alsa-lib avahi libvorbis opus-dev flac libsoxr alsa-utils boost expat
+```
 
-###Build Snapclient and Snapserver
+For Fedora (and probably RHEL, CentOS, & Scientific Linux, but untested):
+
+```sh
+sudo dnf install @development-tools
+sudo dnf install alsa-lib-devel avahi-devel gcc-c++ libatomic libvorbis-devel opus-devel pulseaudio-libs-devel flac-devel soxr-devel libstdc++-static expat boost-devel
+```
+
+### Build Snapclient and Snapserver
+
 `cd` into the Snapcast src-root directory:
 
-    $ cd <snapcast dir>
-    $ make
+```sh
+cd <snapcast dir>
+make
+```
 
 Install Snapclient and/or Snapserver:
 
-    $ sudo make installserver
-    $ sudo make installclient
+```sh
+sudo make installserver
+sudo make installclient
+```
 
-This will copy the client and/or server binary to `/usr/sbin` and update init.d/systemd to start the client/server as a daemon.
+This will copy the client and/or server binary to `/usr/bin` and update init.d/systemd to start the client/server as a daemon.
 
-###Build Snapclient
+### Build Snapclient
+
 `cd` into the Snapclient src-root directory:
 
-    $ cd <snapcast dir>/client
-    $ make
+```sh
+cd <snapcast dir>/client
+make
+```
 
 Install Snapclient
 
-    $ sudo make install
+```sh
+sudo make install
+```
 
-This will copy the client binary to `/usr/sbin` and update init.d/systemd to start the client as a daemon.
+This will copy the client binary to `/usr/bin` and update init.d/systemd to start the client as a daemon.
 
-###Build Snapserver
+### Build Snapserver
+
 `cd` into the Snapserver src-root directory:
 
-    $ cd <snapcast dir>/server
-    $ make
+```sh
+cd <snapcast dir>/server
+make
+```
 
 Install Snapserver
 
-    $ sudo make install
+```sh
+sudo make install
+```
 
-This will copy the server binary to `/usr/sbin` and update init.d/systemd to start the server as a daemon.
+This will copy the server binary to `/usr/bin` and update init.d/systemd to start the server as a daemon.
 
+### Debian packages
 
-##FreeBSD (Native)
+Debian packages can be made with
+
+```sh
+sudo apt-get install debhelper
+cd <snapcast dir>
+fakeroot make -f debian/rules binary
+```
+
+If you don't have boost installed or in your standard include paths, you can call
+
+```sh
+fakeroot make -f debian/rules CPPFLAGS="-I/path/to/boost_1_7x_0" binary
+```
+
+## FreeBSD (Native)
+
 Install the build tools and required libs:  
 
-    $ sudo pkg install gmake gcc bash avahi libogg libvorbis flac
+```sh
+sudo pkg install alsa-lib pulseaudio gmake gcc bash avahi libogg libvorbis opus flac libsoxr
+```
 
-###Build Snapserver
+### Build Snapserver
+
 `cd` into the Snapserver src-root directory:
 
-    $ cd <snapcast dir>/server
-    $ gmake TARGET=FREEBSD
+```sh
+cd <snapcast dir>/server
+gmake TARGET=FREEBSD
+```
 
 Install Snapserver
 
-    $ sudo gmake TARGET=FREEBSD install
+```sh
+sudo gmake TARGET=FREEBSD install
+```
 
-This will copy the server binary to `/usr/local/sbin` and the startup script to `/usr/local/etc/rc.d/snapserver`. To enable the Snapserver, add this line to `/etc/rc.conf`: 
+This will copy the server binary to `/usr/local/bin` and the startup script to `/usr/local/etc/rc.d/snapserver`. To enable the Snapserver, add this line to `/etc/rc.conf`:  
 
-    snapserver_enable="YES"
+```ini
+snapserver_enable="YES"
+```
 
 For additional command line arguments, add in `/etc/rc.conf`:
 
-    snapserver_opts="<your custom options>"
+```ini
+snapserver_opts="<your custom options>"
+```
 
 Start and stop the server with `sudo service snapserver start` and `sudo service snapserver stop`.
 
-##macOS (Native)
+## Gentoo (native)
 
-*Warning: macOS support is experimental*
+Snapcast is available under Gentoo's [Portage](https://wiki.gentoo.org/wiki/Portage) package management system.  Portage utilises `USE` flags to determine what components are built on compilation.  The available options are...
+
+```sh
+equery u snapcast
+[ Legend : U - final flag setting for installation]
+[        : I - package is installed with flag     ]
+[ Colors : set, unset                             ]
+ * Found these USE flags for media-sound/snapcast-9999:
+ U I
+ + - avahi       : Build with avahi support
+ + + client      : Build and install Snapcast client component
+ + - flac        : Build with FLAC compression support
+ + + server      : Build and install Snapcast server component
+ - - static-libs : Build static libs
+ - - tremor      : Build with TREMOR version of vorbis
+ + - vorbis      : Build with libvorbis support
+```
+
+These can be set either in the [global configuration](https://wiki.gentoo.org/wiki//etc/portage/make.conf#USE) file `/etc/portage/make.conf` or on a per-package basis (as root):
+
+```sh
+if [ ! -d "$DIRECTORY" ]; then
+    mkdir /etc/portage/package.use/media-sound
+fi
+echo 'media-sound/snapcast client server flac
+```
+
+If for example you only wish to build the server and *not* the client then precede the server `USE` flag with `-` i.e.
+
+```sh
+echo 'media-sound/snapcast client -server
+```
+
+Once `USE` flags are configured emerge snapcast as root:
+
+```sh
+emerge -av snapcast
+```
+
+Starting the client or server depends on whether you are using `systemd` or `openrc`.  To start using `openrc`:
+
+```sh
+/etc/init.d/snapclient start
+/etc/init.d/snapserver start
+```
+
+To enable the serve and client to start under the default run-level:
+
+```sh
+rc-update add snapserver default
+rc-update add snapclient default
+```
+
+## macOS (Native)
+
+*Warning:* macOS support is experimental
 
  1. Install Xcode from the App Store
  2. Install [Homebrew](http://brew.sh)
  3. Install the required libs
 
-```    
-$ brew install flac libvorbis
+```ssh
+brew install flac libsoxr libvorbis boost opus
 ```
 
-###Build Snapclient
+### Build Snapclient
+
 `cd` into the Snapclient src-root directory:
 
-    $ cd <snapcast dir>/client
-    $ make TARGET=MACOS
+```sh
+cd <snapcast dir>/client
+make TARGET=MACOS
+```
 
 Install Snapclient
 
-    $ sudo make install TARGET=MACOS
+```sh
+sudo make install TARGET=MACOS
+```
 
 This will copy the client binary to `/usr/local/bin` and create a Launch Agent to start the client as a daemon.
 
-###Build Snapserver
+### Build Snapserver
+
 `cd` into the Snapserver src-root directory:
 
-    $ cd <snapcast dir>/server
-    $ make TARGET=MACOS
+```sh
+cd <snapcast dir>/server
+make TARGET=MACOS
+```
 
 Install Snapserver
 
-    $ sudo make install TARGET=MACOS
+```sh
+sudo make install TARGET=MACOS
+```
 
 This will copy the server binary to `/usr/local/bin` and create a Launch Agent to start the server as a daemon.
 
-##Android (Cross compile)
-Cross compilation for Android is done with the [Android NDK](http://developer.android.com/tools/sdk/ndk/index.html) on a Linux host machine.  
+## Android (Cross compile)
 
-###Android NDK setup
-http://developer.android.com/ndk/guides/standalone_toolchain.html
- 1. Download NDK: `https://dl.google.com/android/repository/android-ndk-r13-linux-x86_64.zip`
- 2. Extract to: `/SOME/LOCAL/PATH/android-ndk-r13`
- 3. Setup toolchain somewhere in your home dir (`<android-ndk dir>`):
+Clone [Snapdroid](https://github.com/badaix/snapdroid), which includes Snapclient as submodule:
+```sh
+git clone https://github.com/badaix/snapdroid.git
+cd snapdroid
+git submodule update --init --recursive
+```
+and execute `./gradlew build`, which will cross compile Snapclient and bundle it into the Snapdroid App.
 
-````
-$ cd /SOME/LOCAL/PATH/android-ndk-r13/build/tools
-$ ./make_standalone_toolchain.py --arch arm --api 14 --install-dir <android-ndk dir>
-````
+## OpenWrt/LEDE (Cross compile)
 
-###Build Snapclient
-Edit the first lines in `<snapcast dir>/client/build_android.sh` and in `<snapcast dir>/externals/build_externals_android.sh` to let `NDK_DIR` point to your `<android-ndk dir>`  
-Cross compile and install FLAC, ogg, and tremor (only needed once):
+To cross compile for OpenWrt, please follow the [OpenWrt flavored SnapOS guide](https://github.com/badaix/snapos/blob/master/openwrt/README.md)
 
-    $ cd <snapcast dir>/externals
-    $ ./build_externals_android.sh
-   
-Compile the Snapclient:
+## Buildroot (Cross compile)
 
-    $ cd <snapcast dir>/client
-    $ ./build_android.sh
+To integrate Snapcast into [Buildroot](https://buildroot.org/), please follow the [Buildroot flavored SnapOS guide](https://github.com/badaix/snapos/blob/master/buildroot-external/README.md)
 
-The binaries for `armeabi` and `armeabi-v7a` will be copied into the Android's assets directory (`<snapcast dir>/android/Snapcast/src/main/assets/bin/`) and will be part of the Snapcast App.
+## Windows (vcpkg)
 
+Prerequisites:
 
-##OpenWrt (Cross compile)
-Cross compilation for OpenWrt is done with the [OpenWrt build system](https://wiki.openwrt.org/about/toolchain) on a Linux host machine.  
-https://wiki.openwrt.org/doc/howto/build
+ 1. CMake
+ 2. Visual Studio 2017 or 2019 with C++
 
-###OpenWrt build system setup
-https://wiki.openwrt.org/doc/howto/buildroot.exigence
+Set up [vcpkg](https://github.com/Microsoft/vcpkg)
 
-Clone OpenWrt to some place in your home directory (`<buildroot dir>`)
+Install dependencies
 
-    $ git clone git://git.openwrt.org/15.05/openwrt.git
-
-Download and install available feeds
-
-    $ cd <buildroot dir>
-    $ ./scripts/feeds update -a
-    $ ./scripts/feeds install -a
+```sh
+vcpkg.exe install libflac libvorbis soxr opus boost-asio --triplet x64-windows
+```
 
 Build
 
-    $ make menuconfig
-    $ make
-
-Within the OpenWrt directory create symbolic links to the Snapcast source directory and to the OpenWrt Makefile:
-
-    $ cd <buildroot dir>/package/sxx/snapcast
-    $ ln -s <snapcast dir>/openWrt/Makefile.openwrt Makefile
-    $ ln -s <snapcast dir> src
-
-Build Snapcast:
-
-    $ cd <buildroot dir>
-    $ make package/sxx/snapcast/clean
-    $ make package/sxx/snapcast/compile
-
-The packaged `ipk` files are in `<buildroot dir>/bin/ar71xx/packages/base/snap[client|server]_x.x.x_ar71xx.ipk`
+```sh
+cd <snapcast dir>
+mkdir build
+cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=<vcpkg_dir>/scripts/buildsystems/vcpkg.cmake
+cmake --build . --config Release
+```
