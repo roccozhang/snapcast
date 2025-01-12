@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,10 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_SESSION_TCP_HPP
-#define STREAM_SESSION_TCP_HPP
+#pragma once
 
+
+// local headers
 #include "stream_session.hpp"
+
+// 3rd party headers
+#include <boost/asio/ip/tcp.hpp>
+
+// standard headers
 
 using boost::asio::ip::tcp;
 
@@ -47,7 +53,3 @@ protected:
 private:
     tcp::socket socket_;
 };
-
-
-
-#endif

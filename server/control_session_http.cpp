@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,14 +16,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "control_session_http.hpp"
-#include "common/aixlog.hpp"
-#include "control_session_ws.hpp"
-#include "message/pcm_chunk.hpp"
-#include "stream_session_ws.hpp"
+
+// standard headers
+#include <iostream>
+
+// 3rd party headers
 #include <boost/beast/http/buffer_body.hpp>
 #include <boost/beast/http/file_body.hpp>
-#include <iostream>
+
+// local headers
+#include "common/aixlog.hpp"
+#include "common/message/pcm_chunk.hpp"
+#include "common/utils/file_utils.hpp"
+#include "control_session_ws.hpp"
+#include "stream_session_ws.hpp"
 
 using namespace std;
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
@@ -71,7 +79,8 @@ namespace
 boost::beast::string_view mime_type(boost::beast::string_view path)
 {
     using boost::beast::iequals;
-    auto const ext = [&path] {
+    auto const ext = [&path]
+    {
         auto const pos = path.rfind(".");
         if (pos == boost::beast::string_view::npos)
             return boost::beast::string_view{};
@@ -127,8 +136,8 @@ boost::beast::string_view mime_type(boost::beast::string_view path)
 std::string path_cat(boost::beast::string_view base, boost::beast::string_view path)
 {
     if (base.empty())
-        return path.to_string();
-    std::string result = base.to_string();
+        return std::string(path);
+    std::string result = std::string(base);
     char constexpr path_separator = '/';
     if (result.back() == path_separator)
         result.resize(result.size() - 1);
@@ -165,30 +174,33 @@ template <class Body, class Allocator, class Send>
 void ControlSessionHttp::handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send)
 {
     // Returns a bad request response
-    auto const bad_request = [&req](boost::beast::string_view why) {
+    auto const bad_request = [&req](boost::beast::string_view why)
+    {
         http::response<http::string_body> res{http::status::bad_request, req.version()};
         // TODO: Server: Snapcast/VERSION
         res.set(http::field::server, HTTP_SERVER_NAME);
         res.set(http::field::content_type, "text/html");
         res.keep_alive(req.keep_alive());
-        res.body() = why.to_string();
+        res.body() = std::string(why);
         res.prepare_payload();
         return res;
     };
 
     // Returns a not found response
-    auto const not_found = [&req](boost::beast::string_view target) {
+    auto const not_found = [&req](boost::beast::string_view target)
+    {
         http::response<http::string_body> res{http::status::not_found, req.version()};
         res.set(http::field::server, HTTP_SERVER_NAME);
         res.set(http::field::content_type, "text/html");
         res.keep_alive(req.keep_alive());
-        res.body() = "The resource '" + target.to_string() + "' was not found.";
+        res.body() = "The resource '" + std::string(target) + "' was not found.";
         res.prepare_payload();
         return res;
     };
 
     // Returns a configuration help
-    auto const unconfigured = [&req]() {
+    auto const unconfigured = [&req]()
+    {
         http::response<http::string_body> res{http::status::ok, req.version()};
         res.set(http::field::server, HTTP_SERVER_NAME);
         res.set(http::field::content_type, "text/html");
@@ -199,12 +211,13 @@ void ControlSessionHttp::handle_request(http::request<Body, http::basic_fields<A
     };
 
     // Returns a server error response
-    auto const server_error = [&req](boost::beast::string_view what) {
+    auto const server_error = [&req](boost::beast::string_view what)
+    {
         http::response<http::string_body> res{http::status::internal_server_error, req.version()};
         res.set(http::field::server, HTTP_SERVER_NAME);
         res.set(http::field::content_type, "text/html");
         res.keep_alive(req.keep_alive());
-        res.body() = "An error occurred: '" + what.to_string() + "'";
+        res.body() = "An error occurred: '" + std::string(what) + "'";
         res.prepare_payload();
         return res;
     };
@@ -220,7 +233,9 @@ void ControlSessionHttp::handle_request(http::request<Body, http::basic_fields<A
             return send(bad_request("Illegal request-target"));
 
         std::string request = req.body();
-        return message_receiver_->onMessageReceived(shared_from_this(), request, [req = std::move(req), send = std::move(send)](const std::string& response) {
+        return message_receiver_->onMessageReceived(shared_from_this(), request,
+                                                    [req = std::move(req), send = std::move(send)](const std::string& response)
+                                                    {
             http::response<http::string_body> res{http::status::ok, req.version()};
             res.set(http::field::server, HTTP_SERVER_NAME);
             res.set(http::field::content_type, "application/json");
@@ -236,7 +251,7 @@ void ControlSessionHttp::handle_request(http::request<Body, http::basic_fields<A
     if (target.empty() || target[0] != '/' || target.find("..") != beast::string_view::npos)
         return send(bad_request("Illegal request-target"));
 
-    static string image_cache_target = "/__image_cache?name=";
+    static const string image_cache_target = "/__image_cache?name=";
     auto pos = target.find(image_cache_target);
     if (pos != std::string::npos)
     {
@@ -267,9 +282,8 @@ void ControlSessionHttp::handle_request(http::request<Body, http::basic_fields<A
 
     if (settings_.doc_root.empty())
     {
-        std::string default_page = "/usr/share/snapserver/index.html";
-        struct stat buffer;
-        if (stat(default_page.c_str(), &buffer) == 0)
+        static constexpr auto default_page = "/usr/share/snapserver/index.html";
+        if (utils::file::exists(default_page))
             path = default_page;
         else
             return send(unconfigured());
@@ -340,7 +354,9 @@ void ControlSessionHttp::on_read(beast::error_code ec, std::size_t bytes_transfe
             // Create a WebSocket session by transferring the socket
             // std::make_shared<websocket_session>(std::move(socket_), state_)->run(std::move(req_));
             auto ws = std::make_shared<websocket::stream<beast::tcp_stream>>(std::move(socket_));
-            ws->async_accept(req_, [this, ws, self = shared_from_this()](beast::error_code ec) {
+            ws->async_accept(req_,
+                             [this, ws, self = shared_from_this()](beast::error_code ec)
+                             {
                 if (ec)
                 {
                     LOG(ERROR, LOG_TAG) << "Error during WebSocket handshake (control): " << ec.message() << "\n";
@@ -357,7 +373,9 @@ void ControlSessionHttp::on_read(beast::error_code ec, std::size_t bytes_transfe
             // Create a WebSocket session by transferring the socket
             // std::make_shared<websocket_session>(std::move(socket_), state_)->run(std::move(req_));
             auto ws = std::make_shared<websocket::stream<beast::tcp_stream>>(std::move(socket_));
-            ws->async_accept(req_, [this, ws, self = shared_from_this()](beast::error_code ec) {
+            ws->async_accept(req_,
+                             [this, ws, self = shared_from_this()](beast::error_code ec)
+                             {
                 if (ec)
                 {
                     LOG(ERROR, LOG_TAG) << "Error during WebSocket handshake (stream): " << ec.message() << "\n";
@@ -373,7 +391,9 @@ void ControlSessionHttp::on_read(beast::error_code ec, std::size_t bytes_transfe
     }
 
     // Send the response
-    handle_request(std::move(req_), [this](auto&& response) {
+    handle_request(std::move(req_),
+                   [this](auto&& response)
+                   {
         // The lifetime of the message has to extend
         // for the duration of the async operation so
         // we use a shared_ptr to manage it.

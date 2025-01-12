@@ -13,7 +13,7 @@ The following notation is used in this paragraph:
 The general format of an audio source is:
 
 ```sh
-TYPE://host/path?name=<name>[&codec=<codec>][&sampleformat=<sampleformat>][&chunk_ms=<chunk ms>][&controlscript=<control script filename>]
+TYPE://host/path?name=<name>[&codec=<codec>][&sampleformat=<sampleformat>][&chunk_ms=<chunk ms>][&controlscript=<control script filename>[&controlscriptparams=<control script command line arguments>]]
 ```
 
 Within the `[stream]` section there are some global parameters valid for all `source`s:
@@ -35,8 +35,8 @@ Supported parameters for all source types:
 - `codec`: Override the global codec
 - `sampleformat`: Override the global sample format
 - `chunk_ms`: Override the global `chunk_ms`
-- `dryout_ms`: Supported by non-blocking sourced: when no new data is read from the source, send silence to the clients
 - `controlscript`: Script to control the stream source and read and provide meta data, see [stream_plugin.md](json_rpc_api/stream_plugin.md)
+- `controlscriptparams`: Control script command line arguments, must be url-encoded (use `%20` instead of a space " "), e.g. `--mopidy-host=192.168.42.23%20--debug`
 
 Available audio source types are:
 
@@ -45,17 +45,21 @@ Available audio source types are:
 Captures audio from a named pipe
 
 ```sh
-pipe:///<path/to/pipe>?name=<name>[&mode=create][&dryout_ms=2000]
+pipe:///<path/to/pipe>?name=<name>[&mode=create]
 ```
 
 `mode` can be `create` or `read`. Sometimes your audio source might insist in creating the pipe itself. So the pipe creation mode can by changed to "not create, but only read mode", using the `mode` option set to `read`
+
+**NOTE** With newer kernels using FIFO pipes in a world writeable sticky dir (e.g. `/tmp`) one might also have to turn off `fs.protected_fifos`, as default settings have changed recently: `sudo sysctl fs.protected_fifos=0`. 
+
+See [stackexchange](https://unix.stackexchange.com/questions/503111/group-permissions-for-root-not-working-in-tmp) for more details. You need to run this after each reboot or add it to /etc/sysctl.conf or /etc/sysctl.d/50-default.conf depending on distribution.
 
 ### librespot
 
 Launches librespot and reads audio from stdout
 
 ```sh
-librespot:///<path/to/librespot>?name=<name>[&dryout_ms=2000][&username=<my username>&password=<my password>][&devicename=Snapcast][&bitrate=320][&wd_timeout=7800][&volume=100][&onevent=""][&normalize=false][&autoplay=false][&cache=""][&disable_audio_cache=false][&killall=false][&params=extra-params]
+librespot:///<path/to/librespot>?name=<name>[&username=<my username>&password=<my password>][&devicename=Snapcast][&bitrate=320][&wd_timeout=7800][&volume=100][&onevent=""][&normalize=false][&autoplay=false][&cache=""][&disable_audio_cache=false][&killall=false][&params=extra-params]
 ```
 
 Note that you need to have the librespot binary on your machine and the sampleformat will be set to `44100:16:2`
@@ -86,7 +90,7 @@ Parameters introduced by Snapclient:
 Launches [shairport-sync](https://github.com/mikebrady/shairport-sync) and reads audio from stdout
 
 ```sh
-airplay:///<path/to/shairport-sync>?name=<name>[&dryout_ms=2000][&devicename=Snapcast][&port=5000][&password=<my password>]
+airplay:///<path/to/shairport-sync>?name=<name>[&devicename=Snapcast][&port=5000][&password=<my password>]
 ```
 
 Note that you need to have the shairport-sync binary on your machine and the sampleformat will be set to `44100:16:2`
@@ -96,7 +100,7 @@ Note that you need to have the shairport-sync binary on your machine and the sam
 Parameters used to configure the shairport-sync binary:
 
 - `devicename`: Advertised name
-- `port`: RTSP listening port
+- `port`: RTSP listening port (5000 for Airplay 1, 7000 for Airplay 2)
 - `password`: Password
 - `params`: Optional string appended to the shairport-sync invocation. This allows for arbitrary flags to be passed to shairport-sync, for instance `params=--on-start=start.sh%20--on-stop=stop.sh`. The value has to be properly URL-encoded.
 
@@ -113,7 +117,7 @@ file:///<path/to/PCM/file>?name=<name>
 Launches a process and reads audio from stdout
 
 ```sh
-process:///<path/to/process>?name=<name>[&dryout_ms=2000][&wd_timeout=0][&log_stderr=false][&params=<process arguments>]
+process:///<path/to/process>?name=<name>[&wd_timeout=0][&log_stderr=false][&params=<process arguments>]
 ```
 
 #### Available parameters
@@ -159,14 +163,14 @@ output = audioresample ! audioconvert ! audio/x-raw,rate=48000,channels=2,format
 Captures audio from an alsa device
 
 ```sh
-alsa://?name=<name>&device=<alsa device>[&send_silence=false][&idle_threshold=100][&silence_threshold_percent=0.0]
+alsa:///?name=<name>&device=<alsa device>[&send_silence=false][&idle_threshold=100][&silence_threshold_percent=0.0]
 ```
 
 #### Available parameters
 
 - `device`: alsa device name or identifier, e.g. `default` or `hw:0,0` or `hw:0,0,0`
 - `idle_threshold`: switch stream state from playing to idle after receiving `idle_threshold` milliseconds of silence
-- `silence_threshold_percent`: percent (float) of the max amplitude to be considered as silence 
+- `silence_threshold_percent`: percent (float) of the max amplitude to be considered as silence
 - `send_silence`: forward silence to clients when stream state is `idle`
 
 The output of any audio player that uses alsa can be redirected to Snapcast by using an alsa loopback device:
@@ -243,12 +247,65 @@ The output of any audio player that uses alsa can be redirected to Snapcast by u
     }
     ```
 
+    For [librespot](https://github.com/librespot-org/librespot) (check previusly if your librespot binary is compiled with alsa backend with `./librespot --backend ?`):
+    Warning, you need to set snapserver rate to 44100`source = alsa:///?name=Spotify&sampleformat=44100:16:2&device=hw:0,1,0`
+
+    ```sh
+    ./librespot -b 320 --disable-audio-cache --name Snapcast --initial-volume 100 --backend alsa --device hw:0,0,0
+    ```
+
 4. Configure Snapserver to capture the loopback device:
 
     ```sh
     [stream]
-    source = alsa://?name=SomeName&device=hw:0,1,0
+    source = alsa:///?name=SomeName&device=hw:0,1,0
     ```
+
+### jack
+
+Reads audio from a Jack server. Snapcast must be built with the cmake flag `BUILD_WITH_JACK=ON` (= default) to enable Jack support.
+
+```sh
+jack:///?name=<name>[sampleformat=48000:16:2][autoconnect=][autoconnect_skip=0][&send_silence=false][&idle_threshold=100]
+```
+
+#### Available parameters
+
+- `server_name`: The Jack server name to connect to, leave empty for "default"
+- `autoconnect`: Regular expression to match Jack ports to auto-connect to stream inputs
+- `autoconnect_skip`: Skip this number of matches from the regular expression
+- `idle_threshold`: switch stream state from playing to idle after receiving `idle_threshold` milliseconds of silence
+- `silence_threshold_percent`: percent (float) of the max amplitude to be considered as silence
+- `send_silence`: forward silence to clients when stream state is `idle`
+
+#### Description of Jack stream
+
+Each `jack` stream creates a separate connection to a jack server and registers
+as many input ports as there are audio channels in this stream (according to
+`sampleformat`).
+
+You can use `autoconnect` to automatically connect this streams input ports
+with Jack output ports. The parameter takes a regular expression and matches
+against the whole Jack port name (including client name). For example, if you
+have a Jack client named "system" with four output ports ("playback_1",
+"playback_2", ...) and you want each output as a separate SnapCast stream, you
+could either autoconnect to the exact ports, or you use an `autoconnect` search
+term that returns all ports and use `autoconnect_skip` to pick the right one:
+
+```
+jack:///?name=Channel1&sampleformat=48000:16:1&autoconnect=system:playback_
+jack:///?name=Channel2&sampleformat=48000:16:1&autoconnect=system:playback_&autoconnect_skip=1
+jack:///?name=Channel3&sampleformat=48000:16:1&autoconnect=system:playback_&autoconnect_skip=2
+jack:///?name=Channel4&sampleformat=48000:16:1&autoconnect=system:playback_&autoconnect_skip=3
+```
+
+#### Limitations
+
+- Currently all `jack` streams need to match the sample rate of the Jack server.
+
+- The `chunk_ms` parameter is ignored for jack streams. The Jack buffer size
+  (Frames/Period) is used instead.
+
 
 ### meta
 
@@ -260,3 +317,9 @@ meta:///<name of source#1>/<name of source#2>/.../<name of source#N>?name=<name>
 
 Plays audio from the active source with the highest priority, with `source#1` having the highest priority and `source#N` the lowest.  
 Use `codec=null` for stream sources that should only serve as input for meta streams
+
+## Streaming clients
+
+Streaming clients connect to the server and receive configuration and audio data. The client is fully controlled from the server so clients don't have to persist any state. The `[streaming_client]` section has just one option currently:
+
+- `initial_volume`: 0-100 [percent]: The volume a streaming client gets assigned on very first connect (i.e. the client is not known to the server yet). Defaults to 100 if unset.

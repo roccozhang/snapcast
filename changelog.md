@@ -1,5 +1,88 @@
 # Snapcast changelog
 
+## Version 0.29.0
+
+### Features
+
+- Server: Add support for Jack streams (PR #1241, Issue #644)
+- Client: Add support for 24 and 32 bit audio on Android
+
+### Bugfixes
+
+- Fix linker paths on ARM based MacOS
+
+### General
+
+- Snapweb: Update to v0.8.0
+- CI: Add clang 16, 17, 18, gcc 14, xcode 15.1, 15.2, 15.3, 15.4
+- CI: Create GitHub draft release
+
+_Johannes Pohl <snapcast@badaix.de>  Sun, 25 Aug 2024 00:13:37 +0200_
+
+## Version 0.28.0
+
+### Features
+
+- Server: Use filename as title for FileStreams
+- Client: Loop through resolved server IPs during connect (Issue #1216)
+
+### Bugfixes
+
+- Server: Fix noise caused by reading half samples (Issue #1170)
+- Server: Check open syscall error in PipeStream::do_connect (PR #1150)
+- Server: Tweak Airplay support (#1102)
+- Server: Lower log severity for shairport-sync (Issue #891)
+- Server: Emits notifications for streams with codec=null (Is11sue #1205)
+- Server: Fix delayed switching of meta streams (Issue #1187)
+- Server: Mixer script calls piling up (Issue #1174)
+- Server: Mixer script creates zombie processes (Issue #1157)
+- Improve connect handling in meta_mopidy.py
+- Improve connect handling in meta_librespot-java.py
+- Fix cppcheck issues
+
+### General
+
+- CI: Build debian bookworm and bullseye packages for amd64, arm and arm64
+- CI: Add cppcheck static analysis
+- Update documentation (PR #1130, PR #1067)
+- Delete deprecated Makefiles, CMake is the only supported buildsystem
+- Snapweb: Update to v0.7.0
+
+_Johannes Pohl <snapcast@badaix.de>  Fri, 19 Apr 2024 00:13:37 +0200_
+
+## Version 0.27.0
+
+### Features
+
+- Server: Configurable default volume for new clients (Issue #910, PR #1024)
+- Server: New control script for mopidy: meta_mopidy.py
+- Server: New control script for librespot java: meta_librespot-java.py
+- Server: Add "mute" stream property
+
+### Bugfixes
+
+- Server: Fix random crash with meta stream (Issue #966)
+- Server: Fix compatibility with librespot 0.5-dev (Issue #1063, #1074, #1042)
+- Server: Not terminate on malformed json messages (Issue #1049)
+- Server: Fix random segfault (Issue #1047)
+- Server: Fix growing delay on input stream (Issue #1014)
+- Server: Fix segfault with Librespot on Alpine (Issue #1026)
+- Server: meta_mpd.py is installed with 755 (Issue #1021, #970)
+- Server: Add list of dependecies to meta_mpd.py (Issue #971)
+- Server: meta_mpd.py stopped working (Issue #997)
+- Client: Not terminate if codec is "null" (Issue #1076)
+- Fix test failures (Issue #961)
+
+### General
+
+- Fix compilation on macOS with Xcode 13.4.1 (Issue #1028)
+- Fix compilation with boost 1.81.0 (Issue #1082)
+- Remove debhelper files from project (moved to SnapOS project)
+- SnapOs uses containers to build deb packages (solves Issue #968)
+- Snapweb: Update to v0.5.0
+
+_Johannes Pohl <snapcast@badaix.de>  Sun, 05 Feb 2023 00:13:37 +0200_
+
 ## Version 0.26.0
 
 ### Features
@@ -133,7 +216,7 @@ _Johannes Pohl <snapcast@badaix.de>  Thu, 15 Oct 2020 00:13:37 +0200_
 
 ### General
 
-- debian packag generation switched from make to CMake buildsystem
+- debian package generation switched from make to CMake buildsystem
 - Reintroduce MACOS define, hopefully not breaking anything on macOS
 - Snapcast uses GitHub actions for automated CI/CD
 - CMake installs man files (Issue #507)
@@ -705,7 +788,7 @@ _Johannes Pohl <snapcast@badaix.de>  Wed, 26 Aug 2015 12:00:00 +0200_
 - Code clean up
 - Refactored encoding for lower latency
 
-_Johannes Pohl <snapcast@badaix.de>  Sun, 16 Aug 2015 19:25:51 +0100
+_Johannes Pohl <snapcast@badaix.de>  Sun, 16 Aug 2015 19:25:51 +0100_
 
 ## Version 0.2.1
 
@@ -713,4 +796,4 @@ _Johannes Pohl <snapcast@badaix.de>  Sun, 16 Aug 2015 19:25:51 +0100
 
 - Arch Linux compatibility
 
-_Johannes Pohl <snapcast@badaix.de>  Fri, 24 Jul 2015 15:47:00 +0100
+_Johannes Pohl <snapcast@badaix.de>  Fri, 24 Jul 2015 15:47:00 +0100_

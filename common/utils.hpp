@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,21 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef UTILS_H
-#define UTILS_H
+#pragma once
 
-#include "common/str_compat.hpp"
+
+// local headers
 #include "common/utils/string_utils.hpp"
 
-#include <cctype>
-#include <cerrno>
-// #include <chrono>
+// standard headers
 #include <cstring>
 #include <fstream>
-#include <functional>
 #include <iomanip>
-#include <iterator>
-#include <locale>
 #include <memory>
 #ifndef WINDOWS
 #include <net/if.h>
@@ -43,7 +38,6 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <vector>
 #if !defined(WINDOWS) && !defined(FREEBSD)
 #include <sys/sysinfo.h>
 #endif
@@ -72,12 +66,17 @@ namespace strutils = utils::string;
 #ifndef WINDOWS
 static std::string execGetOutput(const std::string& cmd)
 {
-    std::shared_ptr<::FILE> pipe(popen((cmd + " 2> /dev/null").c_str(), "r"), pclose);
+    std::shared_ptr<::FILE> pipe(popen((cmd + " 2> /dev/null").c_str(), "r"),
+                                 [](::FILE* stream)
+                                 {
+        if (stream != nullptr)
+            pclose(stream);
+    });
     if (!pipe)
         return "";
     char buffer[1024];
-    std::string result = "";
-    while (!feof(pipe.get()))
+    std::string result;
+    while (feof(pipe.get()) == 0)
     {
         if (fgets(buffer, 1024, pipe.get()) != nullptr)
             result += buffer;
@@ -101,7 +100,7 @@ static std::string getProp(const std::string& key, const std::string& def = "")
 
 static std::string getOS()
 {
-    static std::string os("");
+    static std::string os;
 
     if (!os.empty())
         return os;
@@ -137,17 +136,17 @@ static std::string getOS()
         os = "Unknown Windows";
 #else
     os = execGetOutput("lsb_release -d");
-    if ((os.find(":") != std::string::npos) && (os.find("lsb_release") == std::string::npos))
-        os = strutils::trim_copy(os.substr(os.find(":") + 1));
+    if ((os.find(':') != std::string::npos) && (os.find("lsb_release") == std::string::npos))
+        os = strutils::trim_copy(os.substr(os.find(':') + 1));
 #endif
 
 #ifndef WINDOWS
     if (os.empty())
     {
         os = strutils::trim_copy(execGetOutput("grep /etc/os-release /etc/openwrt_release -e PRETTY_NAME -e DISTRIB_DESCRIPTION"));
-        if (os.find("=") != std::string::npos)
+        if (os.find('=') != std::string::npos)
         {
-            os = strutils::trim_copy(os.substr(os.find("=") + 1));
+            os = strutils::trim_copy(os.substr(os.find('=') + 1));
             os.erase(std::remove(os.begin(), os.end(), '"'), os.end());
             os.erase(std::remove(os.begin(), os.end(), '\''), os.end());
         }
@@ -417,7 +416,7 @@ static std::string getMacAddress(const std::string& address)
 }
 #endif
 
-static std::string getHostId(const std::string defaultId = "")
+static std::string getHostId(const std::string& defaultId = "")
 {
     std::string result = strutils::trim_copy(defaultId);
 
@@ -458,6 +457,3 @@ static std::string getHostId(const std::string defaultId = "")
     /// The host name should be unique enough in a LAN
     return getHostName();
 }
-
-
-#endif

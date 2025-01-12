@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,21 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef MESSAGE_FACTORY_HPP
-#define MESSAGE_FACTORY_HPP
+#pragma once
 
+// local headers
 #include "client_info.hpp"
 #include "codec_header.hpp"
 #include "hello.hpp"
 #include "pcm_chunk.hpp"
 #include "server_settings.hpp"
-// #include "stream_tags.hpp"
 #include "time.hpp"
-
-#include "common/str_compat.hpp"
-#include "common/utils.hpp"
-#include "json_message.hpp"
-#include <string>
 
 
 namespace msg
@@ -74,8 +68,6 @@ static std::unique_ptr<BaseMessage> createMessage(const BaseMessage& base_messag
             return createMessage<Hello>(base_message, buffer);
         case message_type::kServerSettings:
             return createMessage<ServerSettings>(base_message, buffer);
-        // case message_type::kStreamTags:
-        //     return createMessage<StreamTags>(base_message, buffer);
         case message_type::kTime:
             return createMessage<Time>(base_message, buffer);
         case message_type::kWireChunk:
@@ -92,5 +84,3 @@ static std::unique_ptr<BaseMessage> createMessage(const BaseMessage& base_messag
 
 } // namespace factory
 } // namespace msg
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,16 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef PCM_STREAM_HPP
-#define PCM_STREAM_HPP
+#pragma once
+
 
 // local headers
 #include "common/error_code.hpp"
 #include "common/json.hpp"
+#include "common/message/codec_header.hpp"
 #include "common/sample_format.hpp"
 #include "encoder/encoder.hpp"
 #include "jsonrpcpp.hpp"
-#include "message/codec_header.hpp"
 #include "properties.hpp"
 #include "server_settings.hpp"
 #include "stream_control.hpp"
@@ -43,7 +43,6 @@
 #include <vector>
 
 
-namespace net = boost::asio;
 
 using json = nlohmann::json;
 
@@ -92,6 +91,7 @@ static constexpr auto kUriName = "name";
 static constexpr auto kUriSampleFormat = "sampleformat";
 static constexpr auto kUriChunkMs = "chunk_ms";
 static constexpr auto kControlScript = "controlscript";
+static constexpr auto kControlScriptParams = "controlscriptparams";
 
 
 /// Reads and decodes PCM data
@@ -141,6 +141,7 @@ public:
     virtual void setShuffle(bool shuffle, ResultHandler handler);
     virtual void setLoopStatus(LoopStatus status, ResultHandler handler);
     virtual void setVolume(uint16_t volume, ResultHandler handler);
+    virtual void setMute(bool mute, ResultHandler handler);
     virtual void setRate(float rate, ResultHandler handler);
 
     // Control commands
@@ -161,6 +162,9 @@ public:
 protected:
     std::atomic<bool> active_;
 
+    /// check if the volume of the \p chunk is below the silence threshold
+    bool isSilent(const msg::PcmChunk& chunk) const;
+
     void setState(ReaderState newState);
     void chunkRead(const msg::PcmChunk& chunk);
     void resync(const std::chrono::nanoseconds& duration);
@@ -180,7 +184,7 @@ protected:
     /// Send request to stream control script
     void sendRequest(const std::string& method, const jsonrpcpp::Parameter& params, ResultHandler handler);
 
-    net::strand<net::any_io_executor> strand_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     std::chrono::time_point<std::chrono::steady_clock> tvEncodedChunk_;
     std::vector<PcmStream::Listener*> pcmListeners_;
     StreamUri uri_;
@@ -190,15 +194,17 @@ protected:
     std::string name_;
     std::atomic<ReaderState> state_;
     Properties properties_;
-    boost::asio::io_context& ioc_;
     ServerSettings server_settings_;
     std::unique_ptr<StreamControl> stream_ctrl_;
     std::atomic<int> req_id_;
     boost::asio::steady_timer property_timer_;
     mutable std::recursive_mutex mutex_;
+    /// If a chunk's max amplitude is below the threshold, it is considered silent
+    int32_t silence_threshold_ = 0;
+    /// Current chunk
+    std::unique_ptr<msg::PcmChunk> chunk_;
+    /// Silent chunk (all 0), for fast silence detection (memcmp)
+    std::vector<char> silent_chunk_;
 };
 
-
 } // namespace streamreader
-
-#endif

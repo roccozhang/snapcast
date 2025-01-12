@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,17 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef CONTROL_SESSION_H
-#define CONTROL_SESSION_H
+#pragma once
 
-#include "common/queue.h"
-#include "message/message.hpp"
-#include "server_settings.hpp"
-#include <atomic>
-#include <boost/asio.hpp>
-#include <condition_variable>
+// local headers
+
+// 3rd party headers
+
+// standard headers
+#include <functional>
 #include <memory>
-#include <set>
 #include <string>
 
 
@@ -68,7 +66,3 @@ public:
 protected:
     ControlMessageReceiver* message_receiver_;
 };
-
-
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,29 +16,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_SERVER_HPP
-#define STREAM_SERVER_HPP
+#pragma once
+
 
 // local headers
-#include "common/queue.h"
-#include "common/sample_format.hpp"
+#include "common/message/message.hpp"
+#include "common/queue.hpp"
 #include "control_server.hpp"
-#include "jsonrpcpp.hpp"
-#include "message/codec_header.hpp"
-#include "message/message.hpp"
-#include "message/server_settings.hpp"
 #include "server_settings.hpp"
 #include "stream_session.hpp"
-#include "streamreader/stream_manager.hpp"
 
 // 3rd party headers
-#include <boost/asio.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
 
 // standard headers
 #include <memory>
 #include <mutex>
-#include <set>
-#include <sstream>
 #include <vector>
 
 
@@ -59,7 +53,7 @@ using session_ptr = std::shared_ptr<StreamSession>;
 class StreamServer : public StreamMessageReceiver
 {
 public:
-    StreamServer(net::io_context& io_context, const ServerSettings& serverSettings, StreamMessageReceiver* messageReceiver = nullptr);
+    StreamServer(boost::asio::io_context& io_context, const ServerSettings& serverSettings, StreamMessageReceiver* messageReceiver = nullptr);
     virtual ~StreamServer();
 
     void start();
@@ -69,7 +63,6 @@ public:
     //	void send(const msg::BaseMessage* message);
 
     void addSession(std::shared_ptr<StreamSession> session);
-    // void onMetadataChanged(const PcmStream* pcmStream, std::shared_ptr<msg::StreamTags> meta);
     void onChunkEncoded(const PcmStream* pcmStream, bool isDefaultStream, std::shared_ptr<msg::PcmChunk> chunk, double duration);
 
     session_ptr getStreamSession(const std::string& clientId) const;
@@ -85,9 +78,8 @@ private:
     void onDisconnect(StreamSession* streamSession) override;
 
     mutable std::recursive_mutex sessionsMutex_;
-    // mutable std::recursive_mutex clientMutex_;
     std::vector<std::weak_ptr<StreamSession>> sessions_;
-    net::io_context& io_context_;
+    boost::asio::io_context& io_context_;
     std::vector<acceptor_ptr> acceptor_;
     boost::asio::steady_timer config_timer_;
 
@@ -95,7 +87,3 @@ private:
     Queue<std::shared_ptr<msg::BaseMessage>> messages_;
     StreamMessageReceiver* messageReceiver_;
 };
-
-
-
-#endif

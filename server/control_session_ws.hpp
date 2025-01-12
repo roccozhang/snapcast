@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,17 +16,32 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef CONTROL_SESSION_WS_HPP
-#define CONTROL_SESSION_WS_HPP
+#pragma once
 
+
+// local headers
 #include "control_session.hpp"
+
+// 3rd party headers
+#include <boost/asio/strand.hpp>
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-with-user-provided-copy"
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <boost/beast/core.hpp>
+#pragma GCC diagnostic pop
 #include <boost/beast/websocket.hpp>
+
+// standard headers
 #include <deque>
+
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
 
 
 /// Endpoint for a connected control client.
@@ -57,10 +72,6 @@ protected:
 
 protected:
     beast::flat_buffer buffer_;
-    net::strand<net::any_io_executor> strand_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     std::deque<std::string> messages_;
 };
-
-
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,11 +16,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef MESSAGE_HPP
-#define MESSAGE_HPP
+#pragma once
 
+// local headers
 #include "common/endian.hpp"
 #include "common/time_defs.hpp"
+
+// standard headers
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -29,7 +31,6 @@
 #include <sys/time.h>
 #endif
 #include <memory>
-#include <vector>
 
 /*
 template<typename CharT, typename TraitsT = std::char_traits<CharT> >
@@ -60,7 +61,7 @@ enum class message_type : uint16_t
     kServerSettings = 3,
     kTime = 4,
     kHello = 5,
-    kStreamTags = 6,
+    // kStreamTags = 6,
     kClientInfo = 7,
 
     kFirst = kBase,
@@ -88,9 +89,6 @@ static std::ostream& operator<<(std::ostream& os, const message_type& msg_type)
             break;
         case message_type::kHello:
             os << "Hello";
-            break;
-        case message_type::kStreamTags:
-            os << "StreamTags";
             break;
         case message_type::kClientInfo:
             os << "ClientInfo";
@@ -154,11 +152,11 @@ using message_ptr = std::shared_ptr<msg::BaseMessage>;
 
 struct BaseMessage
 {
-    BaseMessage() : type(message_type::kBase), id(0), refersTo(0)
+    BaseMessage() : BaseMessage(message_type::kBase)
     {
     }
 
-    BaseMessage(message_type type_) : type(type_), id(0), refersTo(0)
+    BaseMessage(message_type type_) : type(type_), id(0), refersTo(0), size(0)
     {
     }
 
@@ -272,8 +270,8 @@ protected:
 
     void writeVal(std::ostream& stream, const std::string& val) const
     {
-        auto size = static_cast<uint32_t>(val.size());
-        writeVal(stream, val.c_str(), size);
+        auto len = static_cast<uint32_t>(val.size());
+        writeVal(stream, val.c_str(), len);
     }
 
 
@@ -293,6 +291,7 @@ protected:
     void readVal(std::istream& stream, uint16_t& val) const
     {
         stream.read(reinterpret_cast<char*>(&val), sizeof(uint16_t));
+        // cppcheck-suppress selfAssignment
         val = SWAP_16(val);
     }
 
@@ -305,18 +304,21 @@ protected:
     void readVal(std::istream& stream, int16_t& val) const
     {
         stream.read(reinterpret_cast<char*>(&val), sizeof(int16_t));
+        // cppcheck-suppress selfAssignment
         val = SWAP_16(val);
     }
 
     void readVal(std::istream& stream, uint32_t& val) const
     {
         stream.read(reinterpret_cast<char*>(&val), sizeof(uint32_t));
+        // cppcheck-suppress selfAssignment
         val = SWAP_32(val);
     }
 
     void readVal(std::istream& stream, int32_t& val) const
     {
         stream.read(reinterpret_cast<char*>(&val), sizeof(int32_t));
+        // cppcheck-suppress selfAssignment
         val = SWAP_32(val);
     }
 
@@ -329,10 +331,10 @@ protected:
 
     void readVal(std::istream& stream, std::string& val) const
     {
-        uint32_t size;
-        readVal(stream, size);
-        val.resize(size);
-        stream.read(&val[0], size);
+        uint32_t len;
+        readVal(stream, len);
+        val.resize(len);
+        stream.read(&val[0], len);
     }
 
 
@@ -340,5 +342,3 @@ protected:
 };
 
 } // namespace msg
-
-#endif

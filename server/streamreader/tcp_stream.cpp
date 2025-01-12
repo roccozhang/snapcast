@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -68,18 +68,20 @@ TcpStream::TcpStream(PcmStream::Listener* pcmListener, boost::asio::io_context& 
 }
 
 
-void TcpStream::do_connect()
+void TcpStream::connect()
 {
     if (!active_)
         return;
 
     if (is_server_)
     {
-        acceptor_->async_accept([this](boost::system::error_code ec, tcp::socket socket) {
+        acceptor_->async_accept(
+            [this](boost::system::error_code ec, tcp::socket socket)
+            {
             if (!ec)
             {
                 LOG(DEBUG, LOG_TAG) << "New client connection\n";
-                stream_ = make_unique<tcp::socket>(move(socket));
+                stream_ = make_unique<tcp::socket>(std::move(socket));
                 on_connect();
             }
             else
@@ -92,7 +94,9 @@ void TcpStream::do_connect()
     {
         stream_ = make_unique<tcp::socket>(strand_);
         boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(host_), port_);
-        stream_->async_connect(endpoint, [this](const boost::system::error_code& ec) {
+        stream_->async_connect(endpoint,
+                               [this](const boost::system::error_code& ec)
+                               {
             if (!ec)
             {
                 LOG(DEBUG, LOG_TAG) << "Connected\n";
@@ -108,12 +112,13 @@ void TcpStream::do_connect()
 }
 
 
-void TcpStream::do_disconnect()
+void TcpStream::disconnect()
 {
-    if (stream_)
-        stream_->close();
+    reconnect_timer_.cancel();
     if (acceptor_)
         acceptor_->cancel();
-    reconnect_timer_.cancel();
+    AsioStream<tcp::socket>::disconnect();
 }
+
+
 } // namespace streamreader

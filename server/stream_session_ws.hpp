@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,18 +16,30 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_SESSION_WS_HPP
-#define STREAM_SESSION_WS_HPP
+#pragma once
 
+
+// local headers
 #include "stream_session.hpp"
-#include <boost/beast/core.hpp>
-#include <boost/beast/websocket.hpp>
-#include <deque>
 
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
+// 3rd party headers
+#include <boost/asio/strand.hpp>
+#pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-with-user-provided-copy"
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
+#include <boost/beast/core.hpp>
+#pragma GCC diagnostic pop
+#include <boost/beast/websocket.hpp>
+
+// standard headers
+
+
+namespace beast = boost::beast; // from <boost/beast.hpp>
+// namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
 
 
 /// Endpoint for a connected control client.
@@ -57,7 +69,3 @@ protected:
 protected:
     beast::flat_buffer buffer_;
 };
-
-
-
-#endif

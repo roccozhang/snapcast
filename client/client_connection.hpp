@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024 Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,27 +16,27 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef CLIENT_CONNECTION_H
-#define CLIENT_CONNECTION_H
+#pragma once
 
+// local headers
 #include "client_settings.hpp"
+#include "common/message/factory.hpp"
+#include "common/message/message.hpp"
 #include "common/time_defs.hpp"
-#include "message/factory.hpp"
-#include "message/message.hpp"
 
-#include <atomic>
-#include <boost/asio.hpp>
-#include <condition_variable>
+// 3rd party headers
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/strand.hpp>
+
+// standard headers
 #include <deque>
 #include <memory>
-#include <mutex>
-#include <set>
 #include <string>
-#include <thread>
 
 
 using boost::asio::ip::tcp;
-namespace net = boost::asio;
 
 
 class ClientConnection;
@@ -48,66 +48,27 @@ using MessageHandler = std::function<void(const boost::system::error_code&, std:
 class PendingRequest : public std::enable_shared_from_this<PendingRequest>
 {
 public:
-    PendingRequest(const net::strand<net::any_io_executor>& strand, uint16_t reqId, const MessageHandler<msg::BaseMessage>& handler)
-        : id_(reqId), timer_(strand), strand_(strand), handler_(handler){};
-
-    virtual ~PendingRequest()
-    {
-        handler_ = nullptr;
-        timer_.cancel();
-    }
+    PendingRequest(const boost::asio::strand<boost::asio::any_io_executor>& strand, uint16_t reqId, const MessageHandler<msg::BaseMessage>& handler);
+    virtual ~PendingRequest();
 
     /// Set the response for the pending request and passes it to the handler
     /// @param value the response message
-    void setValue(std::unique_ptr<msg::BaseMessage> value)
-    {
-        net::post(strand_, [this, self = shared_from_this(), val = std::move(value)]() mutable {
-            timer_.cancel();
-            if (handler_)
-                handler_({}, std::move(val));
-        });
-    }
+    void setValue(std::unique_ptr<msg::BaseMessage> value);
 
     /// @return the id of the request
-    uint16_t id() const
-    {
-        return id_;
-    }
+    uint16_t id() const;
 
     /// Start the timer for the request
     /// @param timeout the timeout to wait for the reception of the response
-    void startTimer(const chronos::usec& timeout)
-    {
-        timer_.expires_after(timeout);
-        timer_.async_wait([this, self = shared_from_this()](boost::system::error_code ec) {
-            if (!handler_)
-                return;
-            if (!ec)
-            {
-                // !ec => expired => timeout
-                handler_(boost::asio::error::timed_out, nullptr);
-                handler_ = nullptr;
-            }
-            else if (ec != boost::asio::error::operation_aborted)
-            {
-                // ec != aborted => not cancelled (in setValue)
-                //   => should not happen, but who knows => pass the error to the handler
-                handler_(ec, nullptr);
-            }
-        });
-    }
+    void startTimer(const chronos::usec& timeout);
 
     /// Needed to put the requests in a container
-    bool operator<(const PendingRequest& other) const
-    {
-        return (id_ < other.id());
-    }
-
+    bool operator<(const PendingRequest& other) const;
 
 private:
     uint16_t id_;
     boost::asio::steady_timer timer_;
-    net::strand<net::any_io_executor> strand_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     MessageHandler<msg::BaseMessage> handler_;
 };
 
@@ -150,7 +111,9 @@ public:
     template <typename Message>
     void sendRequest(const msg::message_ptr& message, const chronos::usec& timeout, const MessageHandler<Message>& handler)
     {
-        sendRequest(message, timeout, [handler](const boost::system::error_code& ec, std::unique_ptr<msg::BaseMessage> response) {
+        sendRequest(message, timeout,
+                    [handler](const boost::system::error_code& ec, std::unique_ptr<msg::BaseMessage> response)
+                    {
             if (ec)
                 handler(ec, nullptr);
             else if (auto casted_response = msg::message_cast<Message>(std::move(response)))
@@ -173,8 +136,7 @@ protected:
     std::vector<char> buffer_;
     size_t base_msg_size_;
 
-    boost::asio::io_context& io_context_;
-    net::strand<net::any_io_executor> strand_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     tcp::resolver resolver_;
     tcp::socket socket_;
     std::vector<std::weak_ptr<PendingRequest>> pendingRequests_;
@@ -191,7 +153,3 @@ protected:
     };
     std::deque<PendingMessage> messages_;
 };
-
-
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,12 +16,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef META_STREAM_HPP
-#define META_STREAM_HPP
+#pragma once
+
 
 // local headers
-#include "posix_stream.hpp"
-#include "resampler.hpp"
+#include "common/resampler.hpp"
+#include "pcm_stream.hpp"
 
 // standard headers
 #include <memory>
@@ -29,6 +29,8 @@
 namespace streamreader
 {
 
+// Mixing digital audio:
+// https://www.vttoth.com/CMS/technical-notes/?view=article&id=68
 
 /// Reads and decodes PCM data
 /**
@@ -51,6 +53,7 @@ public:
     void setShuffle(bool shuffle, ResultHandler handler) override;
     void setLoopStatus(LoopStatus status, ResultHandler handler) override;
     void setVolume(uint16_t volume, ResultHandler handler) override;
+    void setMute(bool mute, ResultHandler handler) override;
     void setRate(float rate, ResultHandler handler) override;
 
     // Control commands
@@ -81,5 +84,3 @@ protected:
 };
 
 } // namespace streamreader
-
-#endif

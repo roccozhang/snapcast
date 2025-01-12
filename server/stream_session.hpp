@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,27 +16,26 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_SESSION_HPP
-#define STREAM_SESSION_HPP
+#pragma once
 
-#include <atomic>
-#include <condition_variable>
+
+// local headers
+#include "common/message/message.hpp"
+#include "streamreader/stream_manager.hpp"
+
+// 3rd party headers
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/buffer.hpp>
+#include <boost/asio/strand.hpp>
+
+// standard headers
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <boost/asio.hpp>
-
-#include "common/queue.h"
-#include "message/message.hpp"
-#include "streamreader/stream_manager.hpp"
-
-
-namespace net = boost::asio;
 
 
 class StreamSession;
@@ -119,7 +118,7 @@ class StreamSession : public std::enable_shared_from_this<StreamSession>
 {
 public:
     /// ctor. Received message from the client are passed to StreamMessageReceiver
-    StreamSession(const net::any_io_executor& executor, StreamMessageReceiver* receiver);
+    StreamSession(const boost::asio::any_io_executor& executor, StreamMessageReceiver* receiver);
     virtual ~StreamSession() = default;
 
     virtual std::string getIP() = 0;
@@ -159,11 +158,7 @@ protected:
     StreamMessageReceiver* messageReceiver_;
     size_t bufferMs_;
     streamreader::PcmStreamPtr pcmStream_;
-    net::strand<net::any_io_executor> strand_;
+    boost::asio::strand<boost::asio::any_io_executor> strand_;
     std::deque<shared_const_buffer> messages_;
     mutable std::mutex mutex_;
 };
-
-
-
-#endif

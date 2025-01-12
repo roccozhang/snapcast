@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,9 +16,17 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+
+// prototype/interface header file
 #include "control_session_tcp.hpp"
+
+// 3rd party headers
+#include <boost/asio/read_until.hpp>
+#include <boost/asio/write.hpp>
+
+// local headers
 #include "common/aixlog.hpp"
-#include "message/pcm_chunk.hpp"
+
 
 using namespace std;
 
@@ -28,7 +36,7 @@ static constexpr auto LOG_TAG = "ControlSessionTCP";
 
 
 ControlSessionTcp::ControlSessionTcp(ControlMessageReceiver* receiver, tcp::socket&& socket)
-    : ControlSession(receiver), socket_(std::move(socket)), strand_(net::make_strand(socket_.get_executor()))
+    : ControlSession(receiver), socket_(std::move(socket)), strand_(boost::asio::make_strand(socket_.get_executor()))
 {
 }
 
@@ -43,32 +51,35 @@ ControlSessionTcp::~ControlSessionTcp()
 void ControlSessionTcp::do_read()
 {
     const std::string delimiter = "\n";
-    boost::asio::async_read_until(
-        socket_, streambuf_, delimiter, [this, self = shared_from_this(), delimiter](const std::error_code& ec, std::size_t bytes_transferred) {
-            if (ec)
-            {
-                LOG(ERROR, LOG_TAG) << "Error while reading from control socket: " << ec.message() << "\n";
-                return;
-            }
+    boost::asio::async_read_until(socket_, streambuf_, delimiter,
+                                  [this, self = shared_from_this(), delimiter](const std::error_code& ec, std::size_t bytes_transferred)
+                                  {
+        if (ec)
+        {
+            LOG(ERROR, LOG_TAG) << "Error while reading from control socket: " << ec.message() << "\n";
+            return;
+        }
 
-            // Extract up to the first delimiter.
-            std::string line{buffers_begin(streambuf_.data()), buffers_begin(streambuf_.data()) + bytes_transferred - delimiter.length()};
-            if (!line.empty())
+        // Extract up to the first delimiter.
+        std::string line{buffers_begin(streambuf_.data()), buffers_begin(streambuf_.data()) + bytes_transferred - delimiter.length()};
+        if (!line.empty())
+        {
+            if (line.back() == '\r')
+                line.resize(line.size() - 1);
+            // LOG(DEBUG, LOG_TAG) << "received: " << line << "\n";
+            if ((message_receiver_ != nullptr) && !line.empty())
             {
-                if (line.back() == '\r')
-                    line.resize(line.size() - 1);
-                // LOG(DEBUG, LOG_TAG) << "received: " << line << "\n";
-                if ((message_receiver_ != nullptr) && !line.empty())
-                {
-                    message_receiver_->onMessageReceived(shared_from_this(), line, [this](const std::string& response) {
-                        if (!response.empty())
-                            sendAsync(response);
-                    });
-                }
+                message_receiver_->onMessageReceived(shared_from_this(), line,
+                                                     [this](const std::string& response)
+                                                     {
+                    if (!response.empty())
+                        sendAsync(response);
+                });
             }
-            streambuf_.consume(bytes_transferred);
-            do_read();
-        });
+        }
+        streambuf_.consume(bytes_transferred);
+        do_read();
+    });
 }
 
 
@@ -94,7 +105,9 @@ void ControlSessionTcp::stop()
 
 void ControlSessionTcp::sendAsync(const std::string& message)
 {
-    net::post(strand_, [this, self = shared_from_this(), message]() {
+    boost::asio::post(strand_,
+                      [this, self = shared_from_this(), message]()
+                      {
         messages_.emplace_back(message + "\r\n");
         if (messages_.size() > 1)
         {
@@ -107,7 +120,9 @@ void ControlSessionTcp::sendAsync(const std::string& message)
 
 void ControlSessionTcp::send_next()
 {
-    boost::asio::async_write(socket_, boost::asio::buffer(messages_.front()), [this, self = shared_from_this()](std::error_code ec, std::size_t length) {
+    boost::asio::async_write(socket_, boost::asio::buffer(messages_.front()),
+                             [this, self = shared_from_this()](std::error_code ec, std::size_t length)
+                             {
         messages_.pop_front();
         if (ec)
         {

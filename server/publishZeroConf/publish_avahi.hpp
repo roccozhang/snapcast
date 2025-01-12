@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,21 +16,25 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#pragma once
 
-#ifndef PUBLISH_AVAHI_H
-#define PUBLISH_AVAHI_H
 
+// local headers
+
+// 3rd party headers
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
-
-#include <atomic>
 #include <avahi-common/alternative.h>
 #include <avahi-common/error.h>
 #include <avahi-common/malloc.h>
 #include <avahi-common/simple-watch.h>
 #include <avahi-common/timeval.h>
+#include <boost/asio/steady_timer.hpp>
+
+// standard headers
 #include <string>
 #include <vector>
+
 
 class PublishAvahi;
 
@@ -52,6 +56,3 @@ private:
     std::vector<mDNSService> services_;
     boost::asio::steady_timer timer_;
 };
-
-
-#endif

@@ -9,6 +9,10 @@ The goal is to build the following chain:
 audio player software -> snapfifo -> snapserver -> network -> snapclient -> alsa
 ```
 
+**NOTE** With newer kernels using FIFO pipes in a world writeable sticky dir (e.g. `/tmp`) one might also have to turn off `fs.protected_fifos`, as default settings have changed recently: `sudo sysctl fs.protected_fifos=0`. 
+
+See [stackexchange](https://unix.stackexchange.com/questions/503111/group-permissions-for-root-not-working-in-tmp) for more details. You need to run this after each reboot or add it to /etc/sysctl.conf or /etc/sysctl.d/50-default.conf depending on distribution.
+
 ## Streams
 
 Snapserver can read audio from several sources, which are configured in the `snapserver.conf` file (default location is `/etc/snapserver.conf`); the config file can be changed with the `-c` parameter.  
@@ -187,13 +191,32 @@ It might be necessary to set the PulseAudio latency environment variable to 60 m
 ### AirPlay
 
 Snapserver supports [shairport-sync](https://github.com/mikebrady/shairport-sync) with the `stdout` backend and metadata support.
+These options are passed as parameters when Snapcast invokes Shairport-sync, so it _should_ work without modifying the shairport-sync.conf file.
+
+Some distros have shairport-sync packages in their main package repositories, and you may find that they 'just work', as long as you **disable the service**, so that Snapcast has full control of the shairport-sync process. Here is an example for some debian-based distros, but the need for sudo, the name of the package manager, and the syntax to install and control services may vary in your case
+
+```sh
+sudo apt install -y shairport-sync
+sudo systemctl disable --now shairport-sync
+```
+
+Here is an example configuration line for /etc/snapserver.conf but please see [the Snapcast Airplay configuration guide](configuration.md#airplay) for more details on the syntax and options.
+
+```plaintext
+source = airplay:///shairport-sync?name=Airplay
+```
+
+#### in case of issues
+
+Although this _might_ be a quick and convenient way to set up an Airplay source stream, the Snapcast project has no control over how the package is compiled for different distros. Therefore, if you have issues getting the ready-compiled package to work, we recommend that you compile it yourself and re-test, before raising an issue against Snapcast.
 
  1. Install dependencies. For debian derivates: `apt-get install autoconf libpopt-dev libconfig-dev libssl-dev`  
- 2. Build shairport-sync (version 3.3 or later) with `stdout` backend: 
-    - `autoreconf -i -f` 
-    - `./configure --with-stdout --with-avahi --with-ssl=openssl --with-metadata`
+ 2. Build shairport-sync (version 3.3 or later) with `stdout` backend:
+    * `autoreconf -i -f` 
+    * `./configure --with-stdout --with-avahi --with-ssl=openssl --with-metadata`
  3. Copy the `shairport-sync` binary somewhere to your `PATH`, e.g. `/usr/local/bin/`
- 4. Configure snapserver with `source = airplay:///shairport-sync?name=Airplay[&devicename=Snapcast][&port=5000]`
+ 4. Configure snapserver with `source = airplay:///shairport-sync?name=Airplay[&devicename=Snapcast][&port=PORT]`
+    * `PORT` is 5000 for Airplay 1 and 7000 for Airplay 2 
 
 ### Spotify
 
@@ -217,22 +240,70 @@ For example, you could install the minimalist **mpv** media player to pick up We
 
 ```ini
 [stream]
-source = process:///usr/bin/mpv?name=Webradio&sampleformat=48000:16:2&params=http://129.122.92.10:88/broadwavehigh.mp3 --no-terminal --audio-display=no --audio-channels=stereo --audio-samplerate=48000 --audio-format=s16 --ao=pcm:file=/dev/stdout
+# mpv < 0.21.0
+#source = process:///usr/bin/mpv?name=Webradio&sampleformat=48000:16:2&params=http://129.122.92.10:88/broadwavehigh.mp3 --no-terminal --audio-display=no --audio-channels=stereo --audio-samplerate=48000 --audio-format=s16 --ao=pcm:file=/dev/stdout
+# mpv >= 0.21.0
+source = process:///usr/bin/mpv?name=Webradio&sampleformat=48000:16:2&params=http://129.122.92.10:88/broadwavehigh.mp3 --no-terminal --audio-display=no --audio-channels=stereo --audio-samplerate=48000 --audio-format=s16 --ao=pcm --ao-pcm-file=/dev/stdout
+
 ```
 
 ### Line-in
 
+#### ALSA Method
+
+Audio can be played directly through the line-in via ALSA. The following guide was written in regards to a raspberry pi using a HiFiBerry product but it should roughly apply for line-in with other hardware.
+
+1. Get a list of recording devices from ALSA.
+
+    ```shell
+    arecord -l
+    ```
+
+2. You will receive output in the following format. Note the `<device_name>` of your input device for the next step.
+
+    ```shell
+    card <number>: <device_name> ....
+    ```
+
+3. Edit the file `/etc/snapserver.conf` and add the following line, substituting `<device_name>` for the value derived from the previous step. Pick whatever you'd like for `<stream_name>`.
+    ```
+    stream = alsa:///?name=<stream_name>&device=hw:<device_name>
+    ```
+4. Restart the snapserver service.
+   ```
+   sudo service snapserver restart
+   ```
+5. You are done. Enjoy your new snapserver with line in. However, if you'd like to run the client on the same machine as the server then continue with the remaining steps.
+6. Get the sound devices as far as snapclient is concerned. You are looking for the device name. This is probably the same as the `aplay -l` device names so may be able to use that instead.
+   ```
+   snapclient -l
+   ```
+7. In the output you are looking for the `hw:CARD` line that corresponds with the output device you want to use. Note the `<device_name>` for the next step.
+   ```
+   <number> hw:CARD=<device_name>,DEV=<device_number>
+   ```
+8. Edit the file `/etc/default/snapclient` and modify the `SNAPCLIENT_OPTS`. 
+   ```
+   SNAPCLIENT_OPTS=" --host <hostname> -s <dervice_name> "
+   ```
+9. Restart the snapclient service.
+   ```
+   sudo service snapclient restart
+   ```
+
+#### Pipe Method
+
 Audio captured from line-in can be redirected to the snapserver's pipe, e.g. by using:
 
-#### cpiped
+##### cpiped
 
 [cpipe](https://github.com/b-fitzpatrick/cpiped)
 
-#### PulseAudio
+##### PulseAudio
 
 `parec >/tmp/snapfifo` (defaults to 44.1kHz, 16bit, stereo)
 
-### VLC
+#### VLC
 
 Use `--aout afile` and `--audiofile-file` to pipe VLC's audio output to the snapfifo:
 

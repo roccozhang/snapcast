@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,10 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "publish_avahi.hpp"
+
+// local headers
 #include "common/aixlog.hpp"
-#include <cstdio>
-#include <cstdlib>
+
+// 3rd party headers
+
+// standard headers
 
 
 static constexpr auto LOG_TAG = "Avahi";
@@ -64,7 +69,9 @@ void PublishAvahi::publish(const std::vector<mDNSService>& services)
 void PublishAvahi::poll()
 {
     timer_.expires_after(std::chrono::milliseconds(50));
-    timer_.async_wait([this](const boost::system::error_code& ec) {
+    timer_.async_wait(
+        [this](const boost::system::error_code& ec)
+        {
         if (!ec && (avahi_simple_poll_iterate(simple_poll, 0) == 0))
             poll();
     });

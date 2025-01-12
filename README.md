@@ -1,18 +1,20 @@
 # Snapcast
 
-![Snapcast](https://raw.githubusercontent.com/badaix/snapcast/master/doc/Snapcast_800.png)
+![Snapcast](doc/Snapcast_800.png#gh-light-mode-only)
+![Snapweb-Dark](doc/Snapcast_800_dark.png#gh-dark-mode-only)
 
 **S**y**n**chronous **a**udio **p**layer
 
-![Build Status](https://github.com/badaix/snapcast/actions/workflows/ubuntu.yml/badge.svg)
+[![CI](https://github.com/badaix/snapcast/actions/workflows/ci.yml/badge.svg)](https://github.com/badaix/snapcast/actions/workflows/ci.yml)
 [![Github Releases](https://img.shields.io/github/release/badaix/snapcast.svg)](https://github.com/badaix/snapcast/releases)
+[![GitHub Downloads](https://img.shields.io/github/downloads/badaix/snapcast/total)](https://github.com/badaix/snapcast/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/badaix)
 
 Snapcast is a multiroom client-server audio player, where all clients are time synchronized with the server to play perfectly synced audio. It's not a standalone player, but an extension that turns your existing audio player into a Sonos-like multiroom solution.  
 Audio is captured by the server and routed to the connected clients. Several players can feed audio to the server in parallel and clients can be grouped to play the same audio stream.  
 One of the most generic ways to use Snapcast is in conjunction with the music player daemon ([MPD](http://www.musicpd.org/)) or [Mopidy](https://www.mopidy.com/).
 
-![Overview](https://raw.githubusercontent.com/badaix/snapcast/master/doc/Overview.png)
+![Overview](doc/Overview.png)
 
 ## How does it work
 
@@ -55,8 +57,16 @@ Snapcast packages are available for several Linux distributions:
 
 ### Nightly builds
 
-There are debian packages of automated builds for [armhf](https://github.com/badaix/snapcast/actions?query=workflow%3Aself-hosted) and [amd64](https://github.com/badaix/snapcast/actions?query=workflow%3AUbuntu) available in [Actions](https://github.com/badaix/snapcast/actions).  
+There are debian packages of automated builds for `armhf`, `arm64` and `amd64` in [Snapcast Actions - Package workflow](https://github.com/badaix/snapcast/actions/workflows/package.yml).
 Download and extract the archive for your architecture and follow the [debian installation instructions](doc/install.md#debian).
+
+### Install using Homebrew
+
+On macOS and Linux, snapcast can be installed using [Homebrew](https://brew.sh):
+
+```bash
+brew install snapcast
+```
 
 ### Installation from source
 
@@ -71,17 +81,6 @@ Please follow this [guide](doc/build.md) to build Snapcast for
 - [Raspberry Pi](doc/build.md#raspberry-pi-cross-compile)
 - [Windows](doc/build.md#windows-vcpkg)
 
-## SnapOS
-
-The bravest among you may be interested in [SnapOS](https://github.com/badaix/snapos), a small and fast-booting "just enough" OS to run Snapcast as an appliance.
-
-There is a guide (with the necessary buildfiles) available to build SnapOS, which comes in two flavors:
-
-- [Buildroot](https://github.com/badaix/snapos/blob/master/buildroot-external/README.md) based, or
-- [OpenWrt](https://github.com/badaix/snapos/tree/master/openwrt) based.
-
-Please note that there are no pre-built firmware packages available.
-
 ## Configuration
 
 After installation, Snapserver and Snapclient are started with the command line arguments that are configured in `/etc/default/snapserver` and `/etc/default/snapclient`.
@@ -91,9 +90,11 @@ Allowed options are listed in the man pages (`man snapserver`, `man snapclient`)
 
 The server configuration is done in `/etc/snapserver.conf`. Different audio sources can by configured in the `[stream]` section with a list of `source` options, e.g.:
 
-    [stream]
-    source = pipe:///tmp/snapfifo?name=Radio&sampleformat=48000:16:2&codec=flac
-    source = file:///home/user/Musik/Some%20wave%20file.wav?name=File
+```ini
+[stream]
+source = pipe:///tmp/snapfifo?name=Radio&sampleformat=48000:16:2&codec=flac
+source = file:///home/user/Musik/Some%20wave%20file.wav?name=File
+```
 
 Available stream sources are:
 
@@ -123,7 +124,8 @@ Available audio backends are configured using the `--player` command line parame
 | file      | All     | Write audio to file | `filename=<filename>` (`<filename>` = `stdout`, `stderr`, `null` or a filename)<br />`mode=[w|a]` (`w`: write (discarding the content), `a`: append (keeping the content) |
 
 Parameters are appended to the player name, e.g. `--player alsa:buffer_time=100`. Use `--player <name>:?` to get a list of available options.  
-For some audio backends you can configure the PCM device using the `-s` or `--soundcard` parameter, the device is chosen by index or name. Available PCM devices can be listed with `-l` or `--list`
+For some audio backends you can configure the PCM device using the `-s` or `--soundcard` parameter, the device is chosen by index or name. Available PCM devices can be listed with `-l` or `--list`  
+If you are running MPD and Shairport-sync into a soundcard that only supports 48000 sample rate, you can use `--sampleformat <arg>` and the snapclient will resample the audio from shairport-sync, for example, which is 44100 (i.e.  `--sampleformat 48000:16:*`)
 
 ## Test
 
@@ -159,13 +161,14 @@ Snapcast can be controlled using a [JSON-RPC API](doc/json_rpc_api/control.md) o
 
 The server is shipped with [Snapweb](https://github.com/badaix/snapweb), this WebApp can be reached under `http://<snapserver host>:1780`.
 
-![Snapweb](https://raw.githubusercontent.com/badaix/snapweb/master/snapweb.png)
+![Snapweb-Light](https://raw.githubusercontent.com/badaix/snapweb/master/snapweb_light.png#gh-light-mode-only)
+![Snapweb-Dark](https://raw.githubusercontent.com/badaix/snapweb/master/snapweb_dark.png#gh-dark-mode-only)
 
 ### Android client
 
 There is an Android client [snapdroid](https://github.com/badaix/snapdroid) available in [Releases](https://github.com/badaix/snapdroid/releases/latest) and on [Google Play](https://play.google.com/store/apps/details?id=de.badaix.snapcast)
 
-![Snapcast for Android](https://raw.githubusercontent.com/badaix/snapcast/master/doc/snapcast_android_scaled.png)
+![Snapcast for Android](doc/snapcast_android_scaled.png)
 
 ### Contributions
 
@@ -175,7 +178,7 @@ Once installed, you can use any mobile device, laptop, desktop, or browser.
 
 There is also an [unofficial FHEM module](https://forum.fhem.de/index.php/topic,62389.0.html) from @unimatrix27 which integrates a Snapcast controller into the [FHEM](https://fhem.de/fhem.html) home automation system.
 
-There is a [snapcast component for Home Assistant](https://home-assistant.io/components/media_player.snapcast/) which integrates a Snapcast controller in to the [Home Assistant](https://home-assistant.io/) home automation system.
+There is a [snapcast component for Home Assistant](https://home-assistant.io/components/media_player.snapcast/) which integrates a Snapcast controller in to the [Home Assistant](https://home-assistant.io/) home automation system and a [snapcast python plugin for Domoticz](https://github.com/akamming/domoticz-snapcast) to integrate a Snapcast controller into the [Domoticz](https://domoticz.com/) home automation system.
 
 For a web interface in Python, see [snapcastr](https://github.com/xkonni/snapcastr), based on [python-snapcast](https://github.com/happyleavesaoc/python-snapcast). This interface controls client volume and assigns streams to groups.
 

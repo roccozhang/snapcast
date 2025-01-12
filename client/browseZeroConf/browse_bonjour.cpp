@@ -1,8 +1,32 @@
+/***
+    This file is part of snapcast
+    Copyright (C) 2014-2024  Johannes Pohl
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+***/
+
+
+// prototype/interface header file
 #include "browse_bonjour.hpp"
 
+// local headers
+#include "common/aixlog.hpp"
+#include "common/snap_exception.hpp"
+
+// standard headers
 #include <deque>
 #include <iostream>
-#include <memory>
 #ifdef WINDOWS
 #include <WinSock2.h>
 #include <Ws2tcpip.h>
@@ -11,8 +35,6 @@
 #include <sys/socket.h>
 #endif
 
-#include "common/aixlog.hpp"
-#include "common/snap_exception.hpp"
 
 using namespace std;
 
@@ -179,11 +201,12 @@ bool BrowseBonjour::browse(const string& serviceName, mDNSResult& result, int /*
         CHECKED(DNSServiceBrowse(
             service.get(), 0, 0, serviceName.c_str(), "local.",
             [](DNSServiceRef /*service*/, DNSServiceFlags /*flags*/, uint32_t /*interfaceIndex*/, DNSServiceErrorType errorCode, const char* serviceName,
-               const char* regtype, const char* replyDomain, void* context) {
-                auto replyCollection = static_cast<deque<mDNSReply>*>(context);
+               const char* regtype, const char* replyDomain, void* context)
+            {
+            auto replyCollection = static_cast<deque<mDNSReply>*>(context);
 
-                CHECKED(errorCode);
-                replyCollection->push_back(mDNSReply{string(serviceName), string(regtype), string(replyDomain)});
+            CHECKED(errorCode);
+            replyCollection->push_back(mDNSReply{string(serviceName), string(regtype), string(replyDomain)});
             },
             &replyCollection));
 
@@ -198,11 +221,12 @@ bool BrowseBonjour::browse(const string& serviceName, mDNSResult& result, int /*
             CHECKED(DNSServiceResolve(
                 service.get(), 0, 0, reply.name.c_str(), reply.regtype.c_str(), reply.domain.c_str(),
                 [](DNSServiceRef /*service*/, DNSServiceFlags /*flags*/, uint32_t /*interfaceIndex*/, DNSServiceErrorType errorCode, const char* /*fullName*/,
-                   const char* hosttarget, uint16_t port, uint16_t /*txtLen*/, const unsigned char* /*txtRecord*/, void* context) {
-                    auto resultCollection = static_cast<deque<mDNSResolve>*>(context);
+                   const char* hosttarget, uint16_t port, uint16_t /*txtLen*/, const unsigned char* /*txtRecord*/, void* context)
+                {
+                auto resultCollection = static_cast<deque<mDNSResolve>*>(context);
 
-                    CHECKED(errorCode);
-                    resultCollection->push_back(mDNSResolve{string(hosttarget), ntohs(port)});
+                CHECKED(errorCode);
+                resultCollection->push_back(mDNSResolve{string(hosttarget), ntohs(port)});
                 },
                 &resolveCollection));
 
@@ -210,7 +234,7 @@ bool BrowseBonjour::browse(const string& serviceName, mDNSResult& result, int /*
     }
 
     // DNS/mDNS Resolve
-    deque<mDNSResult> resultCollection(resolveCollection.size(), mDNSResult{IPVersion::IPv4, 0, "", "", 0, false});
+    deque<mDNSResult> resultCollection(resolveCollection.size(), mDNSResult{});
     {
         DNSServiceHandle service(new DNSServiceRef(NULL));
         unsigned i = 0;
@@ -220,20 +244,21 @@ bool BrowseBonjour::browse(const string& serviceName, mDNSResult& result, int /*
             CHECKED(DNSServiceGetAddrInfo(
                 service.get(), kDNSServiceFlagsLongLivedQuery, 0, kDNSServiceProtocol_IPv4, resolve.fullName.c_str(),
                 [](DNSServiceRef /*service*/, DNSServiceFlags /*flags*/, uint32_t interfaceIndex, DNSServiceErrorType /*errorCode*/, const char* hostname,
-                   const sockaddr* address, uint32_t /*ttl*/, void* context) {
-                    auto result = static_cast<mDNSResult*>(context);
+                   const sockaddr* address, uint32_t /*ttl*/, void* context)
+                {
+                auto result = static_cast<mDNSResult*>(context);
 
-                    result->host = string(hostname);
-                    result->ip_version = (address->sa_family == AF_INET) ? (IPVersion::IPv4) : (IPVersion::IPv6);
-                    result->iface_idx = static_cast<int>(interfaceIndex);
+                result->host = string(hostname);
+                result->ip_version = (address->sa_family == AF_INET) ? (IPVersion::IPv4) : (IPVersion::IPv6);
+                result->iface_idx = static_cast<int>(interfaceIndex);
 
-                    char hostIP[NI_MAXHOST];
-                    char hostService[NI_MAXSERV];
-                    if (getnameinfo(address, sizeof(*address), hostIP, sizeof(hostIP), hostService, sizeof(hostService), NI_NUMERICHOST | NI_NUMERICSERV) == 0)
-                        result->ip = string(hostIP);
-                    else
-                        return;
-                    result->valid = true;
+                char hostIP[NI_MAXHOST];
+                char hostService[NI_MAXSERV];
+                if (getnameinfo(address, sizeof(*address), hostIP, sizeof(hostIP), hostService, sizeof(hostService), NI_NUMERICHOST | NI_NUMERICSERV) == 0)
+                    result->ip = string(hostIP);
+                else
+                    return;
+                result->valid = true;
                 },
                 &resultCollection[i++]));
         }

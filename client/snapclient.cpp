@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,13 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <chrono>
-#include <iostream>
-#ifndef WINDOWS
-#include <csignal>
-#include <sys/resource.h>
-#endif
-
+// local headers
 #include "common/popl.hpp"
 #include "controller.hpp"
 
@@ -43,11 +37,19 @@
 #include "common/aixlog.hpp"
 #include "common/snap_exception.hpp"
 #include "common/str_compat.hpp"
-#include "common/utils.hpp"
 #include "common/version.hpp"
 
+// 3rd party headers
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/asio/signal_set.hpp>
+
+// standard headers
+#include <iostream>
+#ifndef WINDOWS
+#include <csignal>
+#include <sys/resource.h>
+#endif
+
 
 using namespace std;
 using namespace popl;
@@ -168,10 +170,14 @@ int main(int argc, char** argv)
         hw_mixer_supported = true;
 #endif
         std::shared_ptr<popl::Value<std::string>> mixer_mode;
+
+        std::string mixers = "software";
         if (hw_mixer_supported)
-            mixer_mode = op.add<Value<string>>("", "mixer", "software|hardware|script|none|?[:<options>]", "software");
-        else
-            mixer_mode = op.add<Value<string>>("", "mixer", "software|script|none|?[:<options>]", "software");
+            mixers += "|hardware";
+#ifdef SUPPORTS_VOLUME_SCRIPT
+        mixers += "|script";
+#endif
+        mixer_mode = op.add<Value<string>>("", "mixer", mixers + "|none|?[:<options>]", "software");
 
 // daemon settings
 #ifdef HAS_DAEMON
@@ -200,7 +206,7 @@ int main(int argc, char** argv)
         if (versionSwitch->is_set())
         {
             cout << "snapclient v" << version::code << (!version::rev().empty() ? (" (rev " + version::rev(8) + ")") : ("")) << "\n"
-                 << "Copyright (C) 2014-2021 BadAix (snapcast@badaix.de).\n"
+                 << "Copyright (C) 2014-2024 BadAix (snapcast@badaix.de).\n"
                  << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
                  << "This is free software: you are free to change and redistribute it.\n"
                  << "There is NO WARRANTY, to the extent permitted by law.\n\n"
@@ -396,16 +402,26 @@ int main(int argc, char** argv)
             settings.player.mixer.mode = ClientSettings::Mixer::Mode::software;
         else if ((mode == "hardware") && hw_mixer_supported)
             settings.player.mixer.mode = ClientSettings::Mixer::Mode::hardware;
+#ifdef SUPPORTS_VOLUME_SCRIPT
         else if (mode == "script")
             settings.player.mixer.mode = ClientSettings::Mixer::Mode::script;
+#endif
         else if (mode == "none")
             settings.player.mixer.mode = ClientSettings::Mixer::Mode::none;
         else if ((mode == "?") || (mode == "help"))
         {
-            cout << "mixer can be one of 'software', " << (hw_mixer_supported ? "'hardware', " : "") << "'script', 'none'\n"
+            cout << "mixer can be one of 'software', " << (hw_mixer_supported ? "'hardware', " : "")
+#ifdef SUPPORTS_VOLUME_SCRIPT
+                 << "'script', "
+#endif
+                 << "'none'\n"
                  << "followed by optional parameters:\n"
                  << " * software[:poly[:<exponent>]|exp[:<base>]]\n"
-                 << (hw_mixer_supported ? " * hardware[:<mixer name>]\n" : "") << " * script[:<script filename>]\n";
+                 << (hw_mixer_supported ? " * hardware[:<mixer name>]\n" : "")
+#ifdef SUPPORTS_VOLUME_SCRIPT
+                 << " * script[:<script filename>]"
+#endif
+                 << "\n";
             exit(EXIT_SUCCESS);
         }
         else
@@ -414,7 +430,9 @@ int main(int argc, char** argv)
         boost::asio::io_context io_context;
         // Construct a signal set registered for process termination.
         boost::asio::signal_set signals(io_context, SIGHUP, SIGINT, SIGTERM);
-        signals.async_wait([&](const boost::system::error_code& ec, int signal) {
+        signals.async_wait(
+            [&](const boost::system::error_code& ec, int signal)
+            {
             if (!ec)
                 LOG(INFO, LOG_TAG) << "Received signal " << signal << ": " << strsignal(signal) << "\n";
             else

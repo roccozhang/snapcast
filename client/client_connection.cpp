@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,21 +16,85 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "client_connection.hpp"
+
+// local headers
 #include "common/aixlog.hpp"
-#include "common/snap_exception.hpp"
 #include "common/str_compat.hpp"
-#include "message/hello.hpp"
+
+// 3rd party headers
+#include <boost/asio/read.hpp>
+#include <boost/asio/streambuf.hpp>
+#include <boost/asio/write.hpp>
+
+// standard headers
 #include <iostream>
-#include <mutex>
 
 
 using namespace std;
 
 static constexpr auto LOG_TAG = "Connection";
 
+PendingRequest::PendingRequest(const boost::asio::strand<boost::asio::any_io_executor>& strand, uint16_t reqId, const MessageHandler<msg::BaseMessage>& handler)
+    : id_(reqId), timer_(strand), strand_(strand), handler_(handler)
+{
+}
+
+PendingRequest::~PendingRequest()
+{
+    handler_ = nullptr;
+    timer_.cancel();
+}
+
+void PendingRequest::setValue(std::unique_ptr<msg::BaseMessage> value)
+{
+    boost::asio::post(strand_,
+                      [this, self = shared_from_this(), val = std::move(value)]() mutable
+                      {
+        timer_.cancel();
+        if (handler_)
+            handler_({}, std::move(val));
+    });
+}
+
+uint16_t PendingRequest::id() const
+{
+    return id_;
+}
+
+void PendingRequest::startTimer(const chronos::usec& timeout)
+{
+    timer_.expires_after(timeout);
+    timer_.async_wait(
+        [this, self = shared_from_this()](boost::system::error_code ec)
+        {
+        if (!handler_)
+            return;
+        if (!ec)
+        {
+            // !ec => expired => timeout
+            handler_(boost::asio::error::timed_out, nullptr);
+            handler_ = nullptr;
+        }
+        else if (ec != boost::asio::error::operation_aborted)
+        {
+            // ec != aborted => not cancelled (in setValue)
+            //   => should not happen, but who knows => pass the error to the handler
+            handler_(ec, nullptr);
+        }
+    });
+}
+
+bool PendingRequest::operator<(const PendingRequest& other) const
+{
+    return (id_ < other.id());
+}
+
+
+
 ClientConnection::ClientConnection(boost::asio::io_context& io_context, const ClientSettings::Server& server)
-    : io_context_(io_context), strand_(net::make_strand(io_context_.get_executor())), resolver_(strand_), socket_(strand_), reqId_(1), server_(server)
+    : strand_(boost::asio::make_strand(io_context.get_executor())), resolver_(strand_), socket_(strand_), reqId_(1), server_(server)
 {
     base_msg_size_ = base_message_.getSize();
     buffer_.resize(base_msg_size_);
@@ -71,15 +135,25 @@ void ClientConnection::connect(const ResultHandler& handler)
         return;
     }
 
-    LOG(INFO, LOG_TAG) << "Connecting\n";
-    socket_.connect(*iterator, ec);
-    if (ec)
+    for (const auto& iter : iterator)
+        LOG(DEBUG, LOG_TAG) << "Resolved IP: " << iter.endpoint().address().to_string() << "\n";
+
+    for (const auto& iter : iterator)
     {
-        LOG(ERROR, LOG_TAG) << "Failed to connect to host '" << server_.host << "', error: " << ec.message() << "\n";
-        handler(ec);
-        return;
+        LOG(INFO, LOG_TAG) << "Connecting to " << iter.endpoint() << "\n";
+        socket_.connect(*iterator, ec);
+        if (!ec || (ec == boost::system::errc::interrupted))
+        {
+            // We were successful or interrupted, e.g. by sig int
+            break;
+        }
     }
-    LOG(NOTICE, LOG_TAG) << "Connected to " << socket_.remote_endpoint().address().to_string() << endl;
+
+    if (ec)
+        LOG(ERROR, LOG_TAG) << "Failed to connect to host '" << server_.host << "', error: " << ec.message() << "\n";
+    else
+        LOG(NOTICE, LOG_TAG) << "Connected to " << socket_.remote_endpoint().address().to_string() << endl;
+
     handler(ec);
 
 #if 0
@@ -139,7 +213,9 @@ void ClientConnection::sendNext()
     message.msg->serialize(stream);
     auto handler = message.handler;
 
-    net::async_write(socket_, streambuf, [this, handler](boost::system::error_code ec, std::size_t length) {
+    boost::asio::async_write(socket_, streambuf,
+                             [this, handler](boost::system::error_code ec, std::size_t length)
+                             {
         if (ec)
             LOG(ERROR, LOG_TAG) << "Failed to send message, error: " << ec.message() << "\n";
         else
@@ -157,7 +233,9 @@ void ClientConnection::sendNext()
 
 void ClientConnection::send(const msg::message_ptr& message, const ResultHandler& handler)
 {
-    net::post(strand_, [this, message, handler]() {
+    boost::asio::post(strand_,
+                      [this, message, handler]()
+                      {
         messages_.emplace_back(message, handler);
         if (messages_.size() > 1)
         {
@@ -171,7 +249,9 @@ void ClientConnection::send(const msg::message_ptr& message, const ResultHandler
 
 void ClientConnection::sendRequest(const msg::message_ptr& message, const chronos::usec& timeout, const MessageHandler<msg::BaseMessage>& handler)
 {
-    net::post(strand_, [this, message, timeout, handler]() {
+    boost::asio::post(strand_,
+                      [this, message, timeout, handler]()
+                      {
         pendingRequests_.erase(
             std::remove_if(pendingRequests_.begin(), pendingRequests_.end(), [](std::weak_ptr<PendingRequest> request) { return request.expired(); }),
             pendingRequests_.end());
@@ -182,7 +262,9 @@ void ClientConnection::sendRequest(const msg::message_ptr& message, const chrono
         auto request = make_shared<PendingRequest>(strand_, reqId_, handler);
         pendingRequests_.push_back(request);
         request->startTimer(timeout);
-        send(message, [handler](const boost::system::error_code& ec) {
+        send(message,
+             [handler](const boost::system::error_code& ec)
+             {
             if (ec)
                 handler(ec, nullptr);
         });
@@ -192,7 +274,9 @@ void ClientConnection::sendRequest(const msg::message_ptr& message, const chrono
 
 void ClientConnection::getNextMessage(const MessageHandler<msg::BaseMessage>& handler)
 {
-    net::async_read(socket_, boost::asio::buffer(buffer_, base_msg_size_), [this, handler](boost::system::error_code ec, std::size_t length) mutable {
+    boost::asio::async_read(socket_, boost::asio::buffer(buffer_, base_msg_size_),
+                            [this, handler](boost::system::error_code ec, std::size_t length) mutable
+                            {
         if (ec)
         {
             LOG(ERROR, LOG_TAG) << "Error reading message header of length " << length << ": " << ec.message() << "\n";
@@ -224,7 +308,9 @@ void ClientConnection::getNextMessage(const MessageHandler<msg::BaseMessage>& ha
         if (base_message_.size > buffer_.size())
             buffer_.resize(base_message_.size);
 
-        net::async_read(socket_, boost::asio::buffer(buffer_, base_message_.size), [this, handler](boost::system::error_code ec, std::size_t length) mutable {
+        boost::asio::async_read(socket_, boost::asio::buffer(buffer_, base_message_.size),
+                                [this, handler](boost::system::error_code ec, std::size_t length) mutable
+                                {
             if (ec)
             {
                 LOG(ERROR, LOG_TAG) << "Error reading message body of length " << length << ": " << ec.message() << "\n";

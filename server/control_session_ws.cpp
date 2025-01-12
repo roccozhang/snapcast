@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2023  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,9 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "control_session_ws.hpp"
+
+// local headers
 #include "common/aixlog.hpp"
-#include "message/pcm_chunk.hpp"
+#include "common/message/pcm_chunk.hpp"
+
+// 3rd party headers
+
+// standard headers
 #include <iostream>
 
 using namespace std;
@@ -27,7 +34,7 @@ static constexpr auto LOG_TAG = "ControlSessionWS";
 
 
 ControlSessionWebsocket::ControlSessionWebsocket(ControlMessageReceiver* receiver, websocket::stream<beast::tcp_stream>&& socket)
-    : ControlSession(receiver), ws_(std::move(socket)), strand_(net::make_strand(ws_.get_executor()))
+    : ControlSession(receiver), ws_(std::move(socket)), strand_(boost::asio::make_strand(ws_.get_executor()))
 {
     LOG(DEBUG, LOG_TAG) << "ControlSessionWebsocket\n";
 }
@@ -61,7 +68,9 @@ void ControlSessionWebsocket::stop()
 
 void ControlSessionWebsocket::sendAsync(const std::string& message)
 {
-    net::post(strand_, [this, self = shared_from_this(), msg = message]() {
+    boost::asio::post(strand_,
+                      [this, self = shared_from_this(), msg = message]()
+                      {
         messages_.push_back(std::move(msg));
         if (messages_.size() > 1)
         {
@@ -76,7 +85,9 @@ void ControlSessionWebsocket::sendAsync(const std::string& message)
 void ControlSessionWebsocket::send_next()
 {
     const std::string& message = messages_.front();
-    ws_.async_write(boost::asio::buffer(message), [this, self = shared_from_this()](std::error_code ec, std::size_t length) {
+    ws_.async_write(boost::asio::buffer(message),
+                    [this, self = shared_from_this()](std::error_code ec, std::size_t length)
+                    {
         messages_.pop_front();
         if (ec)
         {
@@ -119,7 +130,9 @@ void ControlSessionWebsocket::on_read_ws(beast::error_code ec, std::size_t bytes
         // LOG(DEBUG, LOG_TAG) << "received: " << line << "\n";
         if ((message_receiver_ != nullptr) && !line.empty())
         {
-            message_receiver_->onMessageReceived(shared_from_this(), line, [this](const std::string& response) {
+            message_receiver_->onMessageReceived(shared_from_this(), line,
+                                                 [this](const std::string& response)
+                                                 {
                 if (!response.empty())
                 {
                     sendAsync(response);

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2023  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,10 +21,10 @@
 
 // local headers
 #include "common/aixlog.hpp"
+#include "common/message/client_info.hpp"
+#include "common/message/hello.hpp"
+#include "common/message/time.hpp"
 #include "config.hpp"
-#include "message/client_info.hpp"
-#include "message/hello.hpp"
-#include "message/time.hpp"
 #include "stream_session_tcp.hpp"
 
 // 3rd party headers
@@ -39,7 +39,7 @@ using json = nlohmann::json;
 
 static constexpr auto LOG_TAG = "StreamServer";
 
-StreamServer::StreamServer(net::io_context& io_context, const ServerSettings& serverSettings, StreamMessageReceiver* messageReceiver)
+StreamServer::StreamServer(boost::asio::io_context& io_context, const ServerSettings& serverSettings, StreamMessageReceiver* messageReceiver)
     : io_context_(io_context), config_timer_(io_context), settings_(serverSettings), messageReceiver_(messageReceiver)
 {
 }
@@ -117,8 +117,17 @@ void StreamServer::onChunkEncoded(const PcmStream* pcmStream, bool isDefaultStre
 
 void StreamServer::onMessageReceived(StreamSession* streamSession, const msg::BaseMessage& baseMessage, char* buffer)
 {
-    if (messageReceiver_ != nullptr)
-        messageReceiver_->onMessageReceived(streamSession, baseMessage, buffer);
+    try
+    {
+        if (messageReceiver_ != nullptr)
+            messageReceiver_->onMessageReceived(streamSession, baseMessage, buffer);
+    }
+    catch (const std::exception& e)
+    {
+        LOG(ERROR, LOG_TAG) << "Server::onMessageReceived exception: " << e.what() << ", message type: " << baseMessage.type << "\n";
+        auto session = getStreamSession(streamSession);
+        session->stop();
+    }
 }
 
 
@@ -133,10 +142,11 @@ void StreamServer::onDisconnect(StreamSession* streamSession)
     LOG(INFO, LOG_TAG) << "onDisconnect: " << session->clientId << "\n";
     LOG(DEBUG, LOG_TAG) << "sessions: " << sessions_.size() << "\n";
     sessions_.erase(std::remove_if(sessions_.begin(), sessions_.end(),
-                                   [streamSession](std::weak_ptr<StreamSession> session) {
-                                       auto s = session.lock();
-                                       return s.get() == streamSession;
-                                   }),
+                                   [streamSession](std::weak_ptr<StreamSession> session)
+                                   {
+        auto s = session.lock();
+        return s.get() == streamSession;
+                    }),
                     sessions_.end());
     LOG(DEBUG, LOG_TAG) << "sessions: " << sessions_.size() << "\n";
     if (messageReceiver_ != nullptr)
@@ -175,7 +185,8 @@ session_ptr StreamServer::getStreamSession(const std::string& clientId) const
 
 void StreamServer::startAccept()
 {
-    auto accept_handler = [this](error_code ec, tcp::socket socket) {
+    auto accept_handler = [this](error_code ec, tcp::socket socket)
+    {
         if (!ec)
             handleAccept(std::move(socket));
         else
@@ -219,7 +230,7 @@ void StreamServer::start()
         try
         {
             LOG(INFO, LOG_TAG) << "Creating stream acceptor for address: " << address << ", port: " << settings_.stream.port << "\n";
-            acceptor_.emplace_back(make_unique<tcp::acceptor>(net::make_strand(io_context_.get_executor()),
+            acceptor_.emplace_back(make_unique<tcp::acceptor>(boost::asio::make_strand(io_context_.get_executor()),
                                                               tcp::endpoint(boost::asio::ip::address::from_string(address), settings_.stream.port)));
         }
         catch (const boost::system::system_error& e)

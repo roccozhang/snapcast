@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,16 +16,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef ENCODER_HPP
-#define ENCODER_HPP
+#pragma once
 
+// local headers
+#include "common/message/codec_header.hpp"
+#include "common/message/pcm_chunk.hpp"
+#include "common/sample_format.hpp"
+
+// standard headers
 #include <functional>
 #include <memory>
 #include <string>
 
-#include "common/sample_format.hpp"
-#include "message/codec_header.hpp"
-#include "message/pcm_chunk.hpp"
 
 namespace encoder
 {
@@ -88,5 +90,3 @@ protected:
 };
 
 } // namespace encoder
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,13 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef WATCH_DOG_HPP
-#define WATCH_DOG_HPP
+#pragma once
 
-#include <boost/asio.hpp>
-#include <memory>
 
-namespace net = boost::asio;
+// 3rd party headers
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/steady_timer.hpp>
+
+// standard headers
+
 
 namespace streamreader
 {
@@ -41,7 +43,7 @@ public:
 class Watchdog
 {
 public:
-    Watchdog(const net::any_io_executor& executor, WatchdogListener* listener = nullptr);
+    Watchdog(const boost::asio::any_io_executor& executor, WatchdogListener* listener = nullptr);
     virtual ~Watchdog();
 
     void start(const std::chrono::milliseconds& timeout);
@@ -55,5 +57,3 @@ private:
 };
 
 } // namespace streamreader
-
-#endif

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,9 +23,7 @@
 #include "base64.h"
 #include "common/aixlog.hpp"
 #include "common/snap_exception.hpp"
-#include "common/utils.hpp"
 #include "common/utils/file_utils.hpp"
-#include "common/utils/string_utils.hpp"
 
 using namespace std;
 
@@ -58,7 +56,7 @@ AirplayStream::AirplayStream(PcmStream::Listener* pcmListener, boost::asio::io_c
     string devicename = uri_.getQuery("devicename", "Snapcast");
     string password = uri_.getQuery("password", "");
 
-    params_wo_port_ = "\"--name=" + devicename + "\" --output=stdout --use-stderr --get-coverart";
+    params_wo_port_ = "\"--name=" + devicename + "\" --output=stdout --get-coverart";
     if (!password.empty())
         params_wo_port_ += " --password \"" + password + "\"";
     if (!params_.empty())
@@ -209,16 +207,16 @@ void AirplayStream::setParamsAndPipePathFromPort()
 }
 
 
-void AirplayStream::do_connect()
+void AirplayStream::connect()
 {
-    ProcessStream::do_connect();
+    ProcessStream::connect();
     pipeReadLine();
 }
 
 
-void AirplayStream::do_disconnect()
+void AirplayStream::disconnect()
 {
-    ProcessStream::do_disconnect();
+    ProcessStream::disconnect();
     // Shairpot-sync created but does not remove the pipe
     if (utils::file::exists(pipePath_) && (remove(pipePath_.c_str()) != 0))
         LOG(INFO, LOG_TAG) << "Failed to remove metadata pipe \"" << pipePath_ << "\": " << errno << "\n";
@@ -245,15 +243,19 @@ void AirplayStream::pipeReadLine()
     }
 
     const std::string delimiter = "\n";
-    boost::asio::async_read_until(*pipe_fd_, streambuf_pipe_, delimiter, [this, delimiter](const std::error_code& ec, std::size_t bytes_transferred) {
+    boost::asio::async_read_until(*pipe_fd_, streambuf_pipe_, delimiter,
+                                  [this, delimiter](const std::error_code& ec, std::size_t bytes_transferred)
+                                  {
         if (ec)
         {
             if ((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::bad_descriptor))
             {
                 // For some reason, EOF is returned until the first metadata is written to the pipe.
                 // If shairport-sync has not finished setting up the pipe, bad file descriptor is returned.
-                LOG(INFO, LOG_TAG) << "Waiting for metadata, retrying in 2500ms\n";
-                wait(pipe_open_timer_, 2500ms, [this] { pipeReadLine(); });
+                static constexpr auto retry_ms = 2500ms;
+                LOG(read_logseverity_, LOG_TAG) << "Waiting for metadata, retrying in " << retry_ms.count() << "ms\n";
+                read_logseverity_ = AixLog::Severity::debug;
+                wait(pipe_open_timer_, retry_ms, [this] { pipeReadLine(); });
             }
             else
             {
@@ -261,6 +263,7 @@ void AirplayStream::pipeReadLine()
             }
             return;
         }
+        read_logseverity_ = AixLog::Severity::info;
 
         // Extract up to the first delimiter.
         std::string line{buffers_begin(streambuf_pipe_.data()), buffers_begin(streambuf_pipe_.data()) + bytes_transferred - delimiter.length()};

@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 #include "common/aixlog.hpp"
 #include "common/snap_exception.hpp"
 #include "common/utils/string_utils.hpp"
-#include "encoder/encoder_factory.hpp"
 
 
 using namespace std;
@@ -102,10 +101,12 @@ void MetaStream::onStateChanged(const PcmStream* pcmStream, ReaderState state)
     LOG(DEBUG, LOG_TAG) << "onStateChanged: " << pcmStream->getName() << ", state: " << state << "\n";
     std::lock_guard<std::recursive_mutex> lock(active_mutex_);
 
-    if (active_stream_->getProperties().playback_status == PlaybackStatus::kPaused)
-        return;
+    // Should a pause keep the stream active? E.g. Spotify can only pause, so it would never get inactive
+    // if (active_stream_->getProperties().playback_status == PlaybackStatus::kPaused)
+    //     return;
 
-    auto switch_stream = [this](std::shared_ptr<PcmStream> new_stream) {
+    auto switch_stream = [this](std::shared_ptr<PcmStream> new_stream)
+    {
         if (new_stream == active_stream_)
             return;
         LOG(INFO, LOG_TAG) << "Stream: " << name_ << ", switching active stream: " << (active_stream_ ? active_stream_->getName() : "<null>") << " => "
@@ -224,6 +225,12 @@ void MetaStream::setVolume(uint16_t volume, ResultHandler handler)
 {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     active_stream_->setVolume(volume, std::move(handler));
+}
+
+void MetaStream::setMute(bool mute, ResultHandler handler)
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    active_stream_->setMute(mute, std::move(handler));
 }
 
 void MetaStream::setRate(float rate, ResultHandler handler)

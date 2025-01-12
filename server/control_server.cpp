@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,17 +16,20 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "control_server.hpp"
+
+// local headers
 #include "common/aixlog.hpp"
-#include "common/snap_exception.hpp"
-#include "common/utils.hpp"
-#include "config.hpp"
+#include "common/json.hpp"
 #include "control_session_http.hpp"
 #include "control_session_tcp.hpp"
-#include "jsonrpcpp.hpp"
-#include "message/time.hpp"
 
+// 3rd party headers
+
+// standard headers
 #include <iostream>
+
 
 using namespace std;
 using json = nlohmann::json;
@@ -49,7 +52,7 @@ ControlServer::~ControlServer()
 
 void ControlServer::cleanup()
 {
-    auto new_end = std::remove_if(sessions_.begin(), sessions_.end(), [](std::weak_ptr<ControlSession> session) { return session.expired(); });
+    auto new_end = std::remove_if(sessions_.begin(), sessions_.end(), [](const std::weak_ptr<ControlSession>& session) { return session.expired(); });
     auto count = distance(new_end, sessions_.end());
     if (count > 0)
     {
@@ -100,14 +103,16 @@ void ControlServer::onNewSession(std::shared_ptr<StreamSession> session)
 
 void ControlServer::startAccept()
 {
-    auto accept_handler_tcp = [this](error_code ec, tcp::socket socket) {
+    auto accept_handler_tcp = [this](error_code ec, tcp::socket socket)
+    {
         if (!ec)
             handleAccept<ControlSessionTcp>(std::move(socket));
         else
             LOG(ERROR, LOG_TAG) << "Error while accepting socket connection: " << ec.message() << "\n";
     };
 
-    auto accept_handler_http = [this](error_code ec, tcp::socket socket) {
+    auto accept_handler_http = [this](error_code ec, tcp::socket socket)
+    {
         if (!ec)
             handleAccept<ControlSessionHttp>(std::move(socket), http_settings_);
         else
@@ -155,7 +160,7 @@ void ControlServer::start()
             try
             {
                 LOG(INFO, LOG_TAG) << "Creating TCP acceptor for address: " << address << ", port: " << tcp_settings_.port << "\n";
-                acceptor_tcp_.emplace_back(make_unique<tcp::acceptor>(net::make_strand(io_context_.get_executor()),
+                acceptor_tcp_.emplace_back(make_unique<tcp::acceptor>(boost::asio::make_strand(io_context_.get_executor()),
                                                                       tcp::endpoint(boost::asio::ip::address::from_string(address), tcp_settings_.port)));
             }
             catch (const boost::system::system_error& e)
@@ -171,7 +176,7 @@ void ControlServer::start()
             try
             {
                 LOG(INFO, LOG_TAG) << "Creating HTTP acceptor for address: " << address << ", port: " << http_settings_.port << "\n";
-                acceptor_http_.emplace_back(make_unique<tcp::acceptor>(net::make_strand(io_context_.get_executor()),
+                acceptor_http_.emplace_back(make_unique<tcp::acceptor>(boost::asio::make_strand(io_context_.get_executor()),
                                                                        tcp::endpoint(boost::asio::ip::address::from_string(address), http_settings_.port)));
             }
             catch (const boost::system::system_error& e)

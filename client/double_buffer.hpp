@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,11 +16,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef DOUBLE_BUFFER_H
-#define DOUBLE_BUFFER_H
+#pragma once
 
+
+// standard headers
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
 
 
@@ -126,7 +129,7 @@ public:
 
     inline bool empty() const
     {
-        return (buffer.size() == 0);
+        return buffer.empty();
     }
 
     void setSize(size_t size)
@@ -136,14 +139,10 @@ public:
 
     const std::deque<T>& getBuffer() const
     {
-        return &buffer;
+        return buffer;
     }
 
 private:
     size_t bufferSize;
     std::deque<T> buffer;
 };
-
-
-
-#endif

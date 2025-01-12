@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_MANAGER_HPP
-#define STREAM_MANAGER_HPP
+#pragma once
+
 
 // local headers
 #include "pcm_stream.hpp"
@@ -55,9 +55,7 @@ private:
     std::vector<PcmStreamPtr> streams_;
     PcmStream::Listener* pcmListener_;
     ServerSettings settings_;
-    boost::asio::io_context& ioc_;
+    boost::asio::io_context& io_context_;
 };
 
 } // namespace streamreader
-
-#endif

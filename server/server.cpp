@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,16 +21,17 @@
 
 // local headers
 #include "common/aixlog.hpp"
+#include "common/message/client_info.hpp"
+#include "common/message/hello.hpp"
+#include "common/message/server_settings.hpp"
+#include "common/message/time.hpp"
 #include "config.hpp"
-#include "message/client_info.hpp"
-#include "message/hello.hpp"
-#include "message/time.hpp"
-#include "stream_session_tcp.hpp"
 
 // 3rd party headers
 
 // standard headers
 #include <iostream>
+
 
 using namespace std;
 using namespace streamreader;
@@ -159,7 +160,6 @@ void Server::processRequest(const jsonrpcpp::request_ptr request, const OnRespon
                 // Notification: {"jsonrpc":"2.0","method":"Client.OnVolumeChanged","params":{"id":"00:21:6a:7d:74:fc","volume":{"muted":false,"percent":74}}}
                 // clang-format on
 
-                // std::lock_guard<std::recursive_mutex> lock(clientMutex_);
                 clientInfo->config.volume.fromJson(request->params().get("volume"));
                 result["volume"] = clientInfo->config.volume.toJson();
                 notification = std::make_shared<jsonrpcpp::Notification>(
@@ -453,7 +453,8 @@ void Server::processRequest(const jsonrpcpp::request_ptr request, const OnRespon
 
                 auto command = request->params().get<string>("command");
 
-                auto handle_response = [request, on_response, command](const snapcast::ErrorCode& ec) {
+                auto handle_response = [request, on_response, command](const snapcast::ErrorCode& ec)
+                {
                     auto log_level = AixLog::Severity::debug;
                     if (ec)
                         log_level = AixLog::Severity::error;
@@ -534,7 +535,8 @@ void Server::processRequest(const jsonrpcpp::request_ptr request, const OnRespon
                 auto value = request->params().get("value");
                 LOG(INFO, LOG_TAG) << "Stream '" << streamId << "' set property: " << name << " = " << value << "\n";
 
-                auto handle_response = [request, on_response](const snapcast::ErrorCode& ec) {
+                auto handle_response = [request, on_response](const snapcast::ErrorCode& ec)
+                {
                     LOG(ERROR, LOG_TAG) << "SetShuffle: " << ec << ", message: " << ec.detailed_message() << ", msg: " << ec.message()
                                         << ", category: " << ec.category().name() << "\n";
                     std::shared_ptr<jsonrpcpp::Response> response;
@@ -564,6 +566,12 @@ void Server::processRequest(const jsonrpcpp::request_ptr request, const OnRespon
                     if (!value.is_number_integer())
                         throw jsonrpcpp::InvalidParamsException("Value for volume must be an int", request->id());
                     stream->setVolume(value.get<int16_t>(), [handle_response](const snapcast::ErrorCode& ec) { handle_response(ec); });
+                }
+                else if (name == "mute")
+                {
+                    if (!value.is_boolean())
+                        throw jsonrpcpp::InvalidParamsException("Value for mute must be bool", request->id());
+                    stream->setMute(value.get<bool>(), [handle_response](const snapcast::ErrorCode& ec) { handle_response(ec); });
                 }
                 else if (name == "rate")
                 {
@@ -636,7 +644,6 @@ void Server::processRequest(const jsonrpcpp::request_ptr request, const OnRespon
 void Server::onMessageReceived(std::shared_ptr<ControlSession> controlSession, const std::string& message, const ResponseHander& response_handler)
 {
     // LOG(DEBUG, LOG_TAG) << "onMessageReceived: " << message << "\n";
-    // std::lock_guard<std::recursive_mutex> lock(clientMutex_);
     std::lock_guard<std::mutex> lock(Config::instance().getMutex());
     jsonrpcpp::entity_ptr entity(nullptr);
     try
@@ -659,7 +666,9 @@ void Server::onMessageReceived(std::shared_ptr<ControlSession> controlSession, c
     if (entity->is_request())
     {
         jsonrpcpp::request_ptr request = dynamic_pointer_cast<jsonrpcpp::Request>(entity);
-        processRequest(request, [this, controlSession, response_handler](jsonrpcpp::entity_ptr response, jsonrpcpp::notification_ptr notification) {
+        processRequest(request,
+                       [this, controlSession, response_handler](jsonrpcpp::entity_ptr response, jsonrpcpp::notification_ptr notification)
+                       {
             saveConfig();
             ////cout << "Request:      " << request->to_json().dump() << "\n";
             if (notification)
@@ -689,8 +698,10 @@ void Server::onMessageReceived(std::shared_ptr<ControlSession> controlSession, c
             if (batch_entity->is_request())
             {
                 jsonrpcpp::request_ptr request = dynamic_pointer_cast<jsonrpcpp::Request>(batch_entity);
-                processRequest(request, [controlSession, response_handler, &responseBatch, &notificationBatch](jsonrpcpp::entity_ptr response,
-                                                                                                               jsonrpcpp::notification_ptr notification) {
+                processRequest(request,
+                               [controlSession, response_handler, &responseBatch, &notificationBatch](jsonrpcpp::entity_ptr response,
+                                                                                                      jsonrpcpp::notification_ptr notification)
+                               {
                     if (response != nullptr)
                         responseBatch.add_ptr(response);
                     if (notification != nullptr)
@@ -712,10 +723,10 @@ void Server::onMessageReceived(std::shared_ptr<ControlSession> controlSession, c
 
 void Server::onMessageReceived(StreamSession* streamSession, const msg::BaseMessage& baseMessage, char* buffer)
 {
-    // std::lock_guard<std::recursive_mutex> lock(clientMutex_);
     LOG(DEBUG, LOG_TAG) << "onMessageReceived: " << baseMessage.type << ", size: " << baseMessage.size << ", id: " << baseMessage.id
                         << ", refers: " << baseMessage.refersTo << ", sent: " << baseMessage.sent.sec << "," << baseMessage.sent.usec
                         << ", recv: " << baseMessage.received.sec << "," << baseMessage.received.usec << "\n";
+
     std::lock_guard<std::mutex> lock(Config::instance().getMutex());
     if (baseMessage.type == message_type::kTime)
     {
@@ -770,6 +781,10 @@ void Server::onMessageReceived(StreamSession* streamSession, const msg::BaseMess
         }
 
         ClientInfoPtr client = group->getClient(streamSession->clientId);
+        if (newGroup)
+        {
+            client->config.volume.percent = settings_.streamingclient.initialVolume;
+        }
 
         LOG(DEBUG, LOG_TAG) << "Sending ServerSettings to " << streamSession->clientId << "\n";
         auto serverSettings = make_shared<msg::ServerSettings>();
@@ -840,7 +855,9 @@ void Server::saveConfig(const std::chrono::milliseconds& deferred)
     std::lock_guard<std::mutex> lock(mutex);
     config_timer_.cancel();
     config_timer_.expires_after(deferred);
-    config_timer_.async_wait([](const boost::system::error_code& ec) {
+    config_timer_.async_wait(
+        [](const boost::system::error_code& ec)
+        {
         if (!ec)
         {
             LOG(DEBUG, LOG_TAG) << "Saving config\n";

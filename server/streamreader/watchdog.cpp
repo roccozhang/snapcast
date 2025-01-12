@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2022  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,8 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+// prototype/interface header file
 #include "watchdog.hpp"
+
+// local headers
 #include "common/aixlog.hpp"
+
+// 3rd party headers
+
+// standard headers
 #include <chrono>
 
 
@@ -29,7 +36,7 @@ using namespace std;
 namespace streamreader
 {
 
-Watchdog::Watchdog(const net::any_io_executor& executor, WatchdogListener* listener) : timer_(executor), listener_(listener)
+Watchdog::Watchdog(const boost::asio::any_io_executor& executor, WatchdogListener* listener) : timer_(executor), listener_(listener)
 {
 }
 
@@ -58,7 +65,9 @@ void Watchdog::trigger()
 {
     timer_.cancel();
     timer_.expires_after(timeout_ms_);
-    timer_.async_wait([this](const boost::system::error_code& ec) {
+    timer_.async_wait(
+        [this](const boost::system::error_code& ec)
+        {
         if (!ec)
         {
             LOG(INFO, LOG_TAG) << "Timed out: " << std::chrono::duration_cast<std::chrono::seconds>(timeout_ms_).count() << "s\n";

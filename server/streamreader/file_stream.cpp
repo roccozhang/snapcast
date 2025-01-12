@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@
 #include "encoder/encoder_factory.hpp"
 
 // 3rd party headers
+
+// standard headers
+#include <filesystem>
 #include <memory>
 
 
@@ -37,7 +40,7 @@ static constexpr auto LOG_TAG = "FileStream";
 
 
 FileStream::FileStream(PcmStream::Listener* pcmListener, boost::asio::io_context& ioc, const ServerSettings& server_settings, const StreamUri& uri)
-    : PosixStream(pcmListener, ioc, server_settings, uri)
+    : AsioStream<stream_descriptor>(pcmListener, ioc, server_settings, uri)
 {
     struct stat buffer;
     if (stat(uri_.path.c_str(), &buffer) != 0)
@@ -48,10 +51,16 @@ FileStream::FileStream(PcmStream::Listener* pcmListener, boost::asio::io_context
     {
         throw SnapException("Not a regular file: \"" + uri_.path + "\"");
     }
+
+    Properties properties;
+    Metadata meta;
+    meta.title = std::filesystem::path(uri_.path).filename().replace_extension("");
+    properties.metadata = meta;
+    setProperties(properties);
 }
 
 
-void FileStream::do_connect()
+void FileStream::connect()
 {
     LOG(DEBUG, LOG_TAG) << "connect\n";
     int fd = open(uri_.path.c_str(), O_RDONLY | O_NONBLOCK);

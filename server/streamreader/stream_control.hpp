@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef STREAM_CONTROL_HPP
-#define STREAM_CONTROL_HPP
+#pragma once
+
 
 // local headers
 #include "jsonrpcpp.hpp"
@@ -31,9 +31,13 @@
 #pragma GCC diagnostic ignored "-Wmissing-braces"
 #pragma GCC diagnostic ignored "-Wnarrowing"
 #pragma GCC diagnostic ignored "-Wc++11-narrowing"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#if !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <boost/process.hpp>
 #pragma GCC diagnostic pop
-#include <boost/asio.hpp>
+#include <boost/asio/any_io_executor.hpp>
 
 // standard headers
 #include <map>
@@ -41,7 +45,6 @@
 
 
 namespace bp = boost::process;
-namespace net = boost::asio;
 
 using json = nlohmann::json;
 
@@ -58,12 +61,11 @@ public:
     using OnResponse = std::function<void(const jsonrpcpp::Response& response)>;
     using OnLog = std::function<void(std::string message)>;
 
-    StreamControl(const net::any_io_executor& executor);
-    virtual ~StreamControl();
+    StreamControl(const boost::asio::any_io_executor& executor);
+    virtual ~StreamControl() = default;
 
     void start(const std::string& stream_id, const ServerSettings& server_setttings, const OnNotification& notification_handler,
                const OnRequest& request_handler, const OnLog& log_handler);
-    virtual void stop();
 
     void command(const jsonrpcpp::Request& request, const OnResponse& response_handler);
 
@@ -74,7 +76,7 @@ protected:
     void onReceive(const std::string& json);
     void onLog(std::string message);
 
-    net::any_io_executor executor_;
+    boost::asio::any_io_executor executor_;
 
 private:
     OnRequest request_handler_;
@@ -88,10 +90,8 @@ private:
 class ScriptStreamControl : public StreamControl
 {
 public:
-    ScriptStreamControl(const net::any_io_executor& executor, const std::string& script);
+    ScriptStreamControl(const boost::asio::any_io_executor& executor, const std::string& script, const std::string& params);
     virtual ~ScriptStreamControl() = default;
-
-    void stop() override;
 
 protected:
     /// Send a message to stdin of the process
@@ -110,10 +110,8 @@ protected:
     boost::asio::streambuf streambuf_stderr_;
 
     std::string script_;
+    std::string params_;
     bp::opstream in_;
 };
 
-
 } // namespace streamreader
-
-#endif

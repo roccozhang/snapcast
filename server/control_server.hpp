@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2020  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,22 +16,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef CONTROL_SERVER_H
-#define CONTROL_SERVER_H
+#pragma once
 
-#include <boost/asio.hpp>
+// local headers
+#include "control_session.hpp"
+#include "server_settings.hpp"
+
+// 3rd party headers
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
+
+// standard headers
 #include <memory>
 #include <mutex>
-#include <set>
 #include <vector>
 
-#include "common/queue.h"
-#include "common/sample_format.hpp"
-#include "control_session.hpp"
-#include "message/codec_header.hpp"
-#include "message/message.hpp"
-#include "message/server_settings.hpp"
-#include "server_settings.hpp"
 
 using boost::asio::ip::tcp;
 using acceptor_ptr = std::unique_ptr<tcp::acceptor>;
@@ -76,7 +75,3 @@ private:
     ServerSettings::Http http_settings_;
     ControlMessageReceiver* controlMessageReceiver_;
 };
-
-
-
-#endif

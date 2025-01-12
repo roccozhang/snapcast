@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,13 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef SERVER_SETTINGS_HPP
-#define SERVER_SETTINGS_HPP
+#pragma once
 
+
+// local headers
+#include "image_cache.hpp"
+
+// standard headers
 #include <string>
 #include <vector>
-
-#include "image_cache.hpp"
 
 
 struct ServerSettings
@@ -65,6 +67,11 @@ struct ServerSettings
         std::vector<std::string> bind_to_address{{"0.0.0.0"}};
     };
 
+    struct StreamingClient
+    {
+        uint16_t initialVolume{100};
+    };
+
     struct Logging
     {
         std::string sink{""};
@@ -75,7 +82,6 @@ struct ServerSettings
     Http http;
     Tcp tcp;
     Stream stream;
+    StreamingClient streamingclient;
     Logging logging;
 };
-
-#endif

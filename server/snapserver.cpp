@@ -1,6 +1,6 @@
 /***
     This file is part of snapcast
-    Copyright (C) 2014-2021  Johannes Pohl
+    Copyright (C) 2014-2024  Johannes Pohl
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,21 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <chrono>
-#include <memory>
-#include <sys/resource.h>
-
+// local headers
 #include "common/popl.hpp"
 #ifdef HAS_DAEMON
 #include "common/daemon.hpp"
 #endif
-#include "common/sample_format.hpp"
 #include "common/snap_exception.hpp"
-#include "common/time_defs.hpp"
 #include "common/utils/string_utils.hpp"
 #include "common/version.hpp"
 #include "encoder/encoder_factory.hpp"
-#include "message/message.hpp"
 #include "server.hpp"
 #include "server_settings.hpp"
 #if defined(HAS_AVAHI) || defined(HAS_BONJOUR)
@@ -39,7 +33,14 @@
 #include "common/aixlog.hpp"
 #include "config.hpp"
 
+// 3rd party headers
 #include <boost/asio/ip/host_name.hpp>
+
+// standard headers
+#include <chrono>
+#include <memory>
+#include <sys/resource.h>
+
 
 using namespace std;
 using namespace popl;
@@ -114,6 +115,10 @@ int main(int argc, char* argv[])
         conf.add<Value<bool>>("", "stream.send_to_muted", "Send audio to muted clients", settings.stream.sendAudioToMutedClients,
                               &settings.stream.sendAudioToMutedClients);
 
+        // streaming_client options
+        conf.add<Value<uint16_t>>("", "streaming_client.initial_volume", "Volume [percent] assigned to new streaming clients",
+                                  settings.streamingclient.initialVolume, &settings.streamingclient.initialVolume);
+
         // logging settings
         conf.add<Value<string>>("", "logging.sink", "log sink [null,system,stdout,stderr,file:<filename>]", settings.logging.sink, &settings.logging.sink);
         auto logfilterOption = conf.add<Value<string>>(
@@ -155,7 +160,7 @@ int main(int argc, char* argv[])
         if (versionSwitch->is_set())
         {
             cout << "snapserver v" << version::code << (!version::rev().empty() ? (" (rev " + version::rev(8) + ")") : ("")) << "\n"
-                 << "Copyright (C) 2014-2021 BadAix (snapcast@badaix.de).\n"
+                 << "Copyright (C) 2014-2024 BadAix (snapcast@badaix.de).\n"
                  << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
                  << "This is free software: you are free to change and redistribute it.\n"
                  << "There is NO WARRANTY, to the extent permitted by law.\n\n"
@@ -283,14 +288,18 @@ int main(int argc, char* argv[])
         if (settings.http.enabled)
         {
             dns_services.emplace_back("_snapcast-http._tcp", settings.http.port);
+        }
+        publishZeroConfg->publish(dns_services);
+#endif
+        if (settings.http.enabled)
+        {
             if ((settings.http.host == "<hostname>") || settings.http.host.empty())
             {
                 settings.http.host = boost::asio::ip::host_name();
                 LOG(INFO, LOG_TAG) << "Using HTTP host name: " << settings.http.host << "\n";
             }
         }
-        publishZeroConfg->publish(dns_services);
-#endif
+
         if (settings.stream.streamChunkMs < 10)
         {
             LOG(WARNING, LOG_TAG) << "Stream read chunk size is less than 10ms, changing to 10ms\n";
@@ -313,7 +322,9 @@ int main(int argc, char* argv[])
 
         // Construct a signal set registered for process termination.
         boost::asio::signal_set signals(io_context, SIGHUP, SIGINT, SIGTERM);
-        signals.async_wait([&io_context](const boost::system::error_code& ec, int signal) {
+        signals.async_wait(
+            [&io_context](const boost::system::error_code& ec, int signal)
+            {
             if (!ec)
                 LOG(INFO, LOG_TAG) << "Received signal " << signal << ": " << strsignal(signal) << "\n";
             else
